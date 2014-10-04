@@ -4,8 +4,15 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <sys/dir.h>
+#include <sys/stat.h>
 #include <iostream>
 using namespace std;
+
+void createSharedFileLoc();
+
+int setupSocketConnections();
+
+void listenForConnections(int sockid);
 
 void peer_handler(int sock_child);
 
@@ -23,12 +30,41 @@ void handle_createtracker_req(int sock_child);
 
 void handle_updatetracker_req(int sock_child);
 
+
 int main(){
-   pid_t pid;
-   struct sockaddr_in server_addr;
-   struct sockaddr_in client_addr;
    int sockid;
-   int sockchild;
+
+   createSharedFileLoc();
+
+   sockid = setupSocketConnections();
+
+   while(1){
+   	listenForConnections(sockid);
+   }
+          
+} // main fun ends  
+    
+void createSharedFileLoc() {
+	struct stat st = {0};
+	char cwd[100];
+	string path;
+
+	if(getcwd(cwd, sizeof(cwd))==NULL) {
+
+	}
+
+	path = cwd;
+	path += "/trackers";
+	cout << path << endl;
+	if(stat(path.c_str(), &st)) {
+		cout<< "making dir" << endl;
+		mkdir(path.c_str(), 0700);
+	}
+}
+
+int setupSocketConnections() {
+   struct sockaddr_in server_addr;
+   int sockid;
    int server_port=1;
 
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
@@ -48,10 +84,17 @@ int main(){
    printf("Tracker SERVER READY TO LISTEN INCOMING REQUEST.... \n");
    if (listen(sockid, 1) < 0){ //(parent) process listens at sockid and check error
 	   printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
-   }                                        
-   
-   while(1) { //accept  connection from every requester client
-	   if ((sockchild = accept(sockid ,(struct sockaddr *) &client_addr, (socklen_t*) &client_addr ))==-1){ /* accept connection and create a socket descriptor for actual work */
+   }  
+
+   return sockid;                                      
+}
+
+void listenForConnections(int sockid) {
+	int sockchild;
+	struct sockaddr_in client_addr;
+	pid_t pid;
+
+	if ((sockchild = accept(sockid ,(struct sockaddr *) &client_addr, (socklen_t*) &client_addr ))==-1){ /* accept connection and create a socket descriptor for actual work */
 		   printf("Tracker Cannot accept...\n"); exit(0); 
 	   }
 
@@ -62,18 +105,13 @@ int main(){
 		   exit(0);         // kill the process. child process all done with work
         }
 	   close(sockchild);  // parent all done with client, only child will communicate with that client from now
-	   
-     }  //accept loop ends            
-} // main fun ends  
-     
-
-
+}
 
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
 	int length;
-	char* read_msg;
-	char* fname;
+	char* read_msg = NULL;
+	char* fname = NULL;
 	int MAXLINE = 100;
 	length=read(sock_child,read_msg,MAXLINE);			
 	read_msg[length]='\0';
@@ -96,3 +134,7 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	}
 	
 }//end client handler function
+
+void handle_list_req(int sock_child) {
+	
+}
