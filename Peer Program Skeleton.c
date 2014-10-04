@@ -1,7 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <errno.h>
 #include <iostream>
 using namespace std;
 
@@ -13,26 +17,26 @@ void processListCommand(int sockid);
 
 void processGetCommand(int sockid);
 
-int main(int argc,char *argv[]){
-	
+int main(int argc,char *argv[]){	
    	char server_address[50];
-	int server_port=3490;  // you should instead read from configuration file
-    
-   
+	int server_port=0;  // you should instead read from configuration file   
 	struct sockaddr_in server_addr;
 	int sockid;
         
+	cout << "creating socket" << endl;
+
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);
 	}
                                               
-   
+   	cout << "connecting socket" << endl;
+
     server_addr.sin_family = AF_INET;//host byte order
     server_addr.sin_port = htons(server_port);// convert to network byte order
+    server_addr.sin_addr.s_addr = INADDR_ANY;
     if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
-		printf("Cannot connect to server\n"); exit(0);
+		cout<< errno << endl; printf("Cannot connect to server\n"); exit(0);
 	}
-
    /* If connected successfully*/
     
 	if(strcmp(argv[1],"createtracker")){
@@ -46,7 +50,6 @@ int main(int argc,char *argv[]){
 	} else {
 		printf("Unrecognized command");
 	}
-
     
 }
 
@@ -54,6 +57,9 @@ void processCreateTrackerCommand(int sockid) {
 	// int list_req=htons(LIST);
 	char* list_req = "createtracker";
 	char* msg;
+
+	printf("creating tracker");
+
 	if((write(sockid,list_req, sizeof(list_req))) < 0){//inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
 	}

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -12,12 +14,12 @@ using namespace std;
 string trackerFilePath;
 
 struct TrackerFile {
-	string filename;
-	string filesize;
-	string description;
-	string md5;
-	string ip;
-	string port;
+	char* filename;
+	char* filesize;
+	char* description;
+	char* md5;
+	char* ip;
+	char* port;
 };
 
 void createSharedFileLoc();
@@ -34,17 +36,17 @@ char* createTrackerFile(char* read_msg);
 
 TrackerFile parseCreateTrackerMsg(char* read_msg);
 
-void handle_list_req(int sock_child);
+// void handle_list_req(int sock_child);
 
-char* xtrct_fname(char* msg, char* something);
+// char* xtrct_fname(char* msg, char* something);
 
-void handle_get_req(int sock_child, char* fname);
+// void handle_get_req(int sock_child, char* fname);
 
 // void tokenize_createmsg(char* msg);
 
-void tokenize_updatemsg(char* msg);
+// void tokenize_updatemsg(char* msg);
 
-void handle_updatetracker_req(int sock_child);
+// void handle_updatetracker_req(int sock_child);
 
 int main(){
    int sockid;
@@ -54,6 +56,7 @@ int main(){
    sockid = setupSocketConnections();
 
    while(1){
+   	cout << "listening" << endl;
    	listenForConnections(sockid);
    }
           
@@ -77,7 +80,7 @@ void createSharedFileLoc() {
 int setupSocketConnections() {
    struct sockaddr_in server_addr;
    int sockid;
-   int server_port=1;
+   int server_port=0;
 
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
 	   printf("socket cannot be created \n"); exit(0); 
@@ -130,12 +133,12 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	read_msg[length]='\0';
 
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
-		handle_list_req(sock_child);// handle list request
+		// handle_list_req(sock_child);// handle list request
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		fname = xtrct_fname(read_msg, " ");// extract filename from the command		
-		handle_get_req(sock_child, fname);
+		// fname = xtrct_fname(read_msg, " ");// extract filename from the command		
+		// handle_get_req(sock_child, fname);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		// tokenize_createmsg(read_msg);
@@ -143,8 +146,8 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
-		tokenize_updatemsg(read_msg);
-		handle_updatetracker_req(sock_child);		
+		// tokenize_updatemsg(read_msg);
+		// handle_updatetracker_req(sock_child);		
 	}
 	
 }//end client handler function
@@ -173,12 +176,12 @@ char* createTrackerFile(char* read_msg) {
 		fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "w");
 	}
 
-	if(fputs((tf.filename + '\n').c_str(), fp) == EOF) { return err;}
-	if(fputs((tf.filesize + '\n').c_str(), fp) == EOF) { return err;}
-	if(fputs((tf.description + '\n').c_str(), fp) == EOF) { return err;}
-	if(fputs((tf.md5 + '\n').c_str(), fp) == EOF) { return err;}
-	if(fputs((tf.ip + '\n').c_str(), fp) == EOF) { return err;}
-	if(fputs((tf.port + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.filename + '\n'), fp) == EOF) { return err;}
+	if(fputs((tf.filesize + '\n'), fp) == EOF) { return err;}
+	if(fputs((tf.description + '\n'), fp) == EOF) { return err;}
+	if(fputs((tf.md5 + '\n'), fp) == EOF) { return err;}
+	if(fputs((tf.ip + '\n'), fp) == EOF) { return err;}
+	if(fputs((tf.port + '\n'), fp) == EOF) { return err;}
 	return "<createtracker succ>";
 }
 
@@ -186,12 +189,12 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
 	struct TrackerFile tf;
 
-	tf.filename = *strtok(msg, " ");
-	tf.filesize = *strtok(msg, " ");
-	tf.description = *strtok(msg, " ");
-	tf.md5 = *strtok(msg, " ");
-	tf.ip = *strtok(msg, " ");
-	tf.port = *strtok(msg, " ");
+	tf.filename = strtok(msg, " ");
+	tf.filesize = strtok(msg, " ");
+	tf.description = strtok(msg, " ");
+	tf.md5 = strtok(msg, " ");
+	tf.ip = strtok(msg, " ");
+	tf.port = strtok(msg, " ");
 	return tf;
 }
 
