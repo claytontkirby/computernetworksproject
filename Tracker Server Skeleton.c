@@ -7,6 +7,21 @@
 #include <iostream>
 using namespace std;
 
+void peer_handler(int sock_child);
+
+void handle_list_req(int sock_child);
+
+char* xtrct_fname(char* msg, char* something);
+
+void handle_get_req(int sock_child, char* fname);
+
+void tokenize_createmsg(char* msg);
+
+void tokenize_updatemsg(char* msg);
+
+void handle_createtracker_req(int sock_child);
+
+void handle_updatetracker_req(int sock_child);
 
 int main(){
    pid_t pid;
@@ -36,7 +51,7 @@ int main(){
    }                                        
    
    while(1) { //accept  connection from every requester client
-	   if (sockchild = accept(sockid ,(struct sockaddr *) &client_addr, sizeof(struct client_addr))==-1){ /* accept connection and create a socket descriptor for actual work */
+	   if ((sockchild = accept(sockid ,(struct sockaddr *) &client_addr, (socklen_t*) &client_addr ))==-1){ /* accept connection and create a socket descriptor for actual work */
 		   printf("Tracker Cannot accept...\n"); exit(0); 
 	   }
 
@@ -54,9 +69,12 @@ int main(){
 
 
 
-peer_handler(int sock_child){ // function for file transfer. child process will call this function     
+void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
 	int length;
+	char* read_msg;
+	char* fname;
+	int MAXLINE = 100;
 	length=read(sock_child,read_msg,MAXLINE);			
 	read_msg[length]='\0';
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
@@ -64,7 +82,7 @@ peer_handler(int sock_child){ // function for file transfer. child process will 
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		xtrct_fname(read_msg, " ");// extract filename from the command		
+		fname = xtrct_fname(read_msg, " ");// extract filename from the command		
 		handle_get_req(sock_child, fname);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
