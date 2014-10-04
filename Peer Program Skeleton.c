@@ -3,10 +3,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
 #include <iostream>
+#include <arpa/inet.h>
+#include <dirent.h>
 using namespace std;
 
 void processCreateTrackerCommand(int sockid);
@@ -19,7 +22,7 @@ void processGetCommand(int sockid);
 
 int main(int argc,char *argv[]){	
    	char server_address[50];
-	int server_port=0;  // you should instead read from configuration file   
+	int server_port=5000;  // you should instead read from configuration file   
 	struct sockaddr_in server_addr;
 	int sockid;
         
@@ -33,19 +36,20 @@ int main(int argc,char *argv[]){
 
     server_addr.sin_family = AF_INET;//host byte order
     server_addr.sin_port = htons(server_port);// convert to network byte order
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
 		cout<< errno << endl; printf("Cannot connect to server\n"); exit(0);
 	}
    /* If connected successfully*/
-    
-	if(strcmp(argv[1],"createtracker")){
+    cout << "connected" << endl;
+
+	if(strcmp(argv[1],"createtracker") == 0){
 		processCreateTrackerCommand(sockid);
-	} else if(strcmp(argv[1], "updatetracker")) {
+	} else if(strcmp(argv[1], "updatetracker") == 0) {
 		processUpdateTrackerCommand(sockid);
-	} else if(strcmp(argv[1], "list")) {
+	} else if(strcmp(argv[1], "list") == 0) {
 		processListCommand(sockid);
-	} else if(strcmp(argv[1], "get")) {
+	} else if(strcmp(argv[1], "get") == 0) {
 		processGetCommand(sockid);
 	} else {
 		printf("Unrecognized command");
@@ -55,17 +59,47 @@ int main(int argc,char *argv[]){
 
 void processCreateTrackerCommand(int sockid) {
 	// int list_req=htons(LIST);
-	char* list_req = "createtracker";
+	string list_req = "createtracker";
 	char* msg;
+	DIR* FD;
+	struct dirent* in_file;
+	char const * DirName = "/tmp";
+	char * FullName;  	
+	struct stat statbuf;
 
-	printf("creating tracker");
-
-	if((write(sockid,list_req, sizeof(list_req))) < 0){//inform the server of the list request
-		printf("Send_request  failure\n"); exit(0);
+	if(NULL == (FD = opendir("/Users/clayton/Desktop/peerfiles"))) {
+		cout << "error" << endl;
 	}
 
-    if((read(sockid, &msg, sizeof(msg)))< 0){// read what server has said
-		printf("Read  failure\n"); exit(0); 
+	while((in_file = readdir(FD))) {
+		FullName = (char*) malloc(strlen(DirName) + strlen(in_file->d_name) + 2);
+		strcpy(FullName, DirName);
+		strcat(FullName, "/");
+		strcat(FullName, in_file->d_name);
+		stat(FullName, &statbuf);
+		free(FullName);
+
+		list_req += " ";
+		list_req += in_file->d_name;
+		list_req += " ";
+		list_req += statbuf.st_size;
+		list_req += " ";
+		list_req += "description";
+		list_req += " ";
+		list_req += "132451325987";
+		list_req += " ";
+		list_req += "127.0.0.1";
+		list_req += " ";
+		list_req += "5000";
+
+		if((write(sockid,list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
+			printf("Send_request  failure\n"); exit(0);
+		}
+
+	    if((read(sockid, &msg, sizeof(msg)))< 0){// read what server has said
+			printf("Read  failure\n"); exit(0); 
+		}
+
 	}
 	
 	close(sockid);

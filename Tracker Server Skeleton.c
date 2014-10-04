@@ -80,7 +80,7 @@ void createSharedFileLoc() {
 int setupSocketConnections() {
    struct sockaddr_in server_addr;
    int sockid;
-   int server_port=0;
+   int server_port=5000;
 
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
 	   printf("socket cannot be created \n"); exit(0); 
@@ -113,12 +113,12 @@ void listenForConnections(int sockid) {
 		   printf("Tracker Cannot accept...\n"); exit(0); 
 	}
 
-   if ((pid=fork())==0){//New child process will serve the requester client. separate child will serve separate client
+	// if ((pid=fork())==0){//New child process will serve the requester client. separate child will serve separate client
 	   close(sockid);   //child does not need listener
 	   peer_handler(sockchild);//child is serving the client.		   
 	   close (sockchild);// printf("\n 1. closed");
 	   exit(0);         // kill the process. child process all done with work
-    }
+    // }
 
 	close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
@@ -126,11 +126,13 @@ void listenForConnections(int sockid) {
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
 	int length;
-	char* read_msg = NULL;
+	char read_msg[100];
 	char* fname = NULL;
-	int MAXLINE = 100;
-	length=read(sock_child,read_msg,MAXLINE);			
+	int MAXLINE = 10;	
+	length=read(sock_child, &read_msg, 100);
 	read_msg[length]='\0';
+
+	cout << read_msg << endl;
 
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
 		// handle_list_req(sock_child);// handle list request
@@ -142,6 +144,7 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		// tokenize_createmsg(read_msg);
+		cout << "received create msg" << endl;
 		handle_createtracker_req(sock_child, read_msg);
 		
 	}
@@ -158,6 +161,8 @@ void handle_list_req(int sock_child) {
 
 void handle_createtracker_req(int sock_child, char* read_msg) {
 	char* msg;
+
+	cout << "handling create tracker msg" << endl;
 
 	if((write(sock_child, (msg = createTrackerFile(read_msg)), sizeof(msg))) < 0){//inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
@@ -176,6 +181,8 @@ char* createTrackerFile(char* read_msg) {
 		fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "w");
 	}
 
+	cout << "creating tracker file" << endl;
+
 	if(fputs((tf.filename + '\n'), fp) == EOF) { return err;}
 	if(fputs((tf.filesize + '\n'), fp) == EOF) { return err;}
 	if(fputs((tf.description + '\n'), fp) == EOF) { return err;}
@@ -188,6 +195,8 @@ char* createTrackerFile(char* read_msg) {
 TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
 	struct TrackerFile tf;
+
+	cout << "parsing tracker msg" << endl;
 
 	tf.filename = strtok(msg, " ");
 	tf.filesize = strtok(msg, " ");
