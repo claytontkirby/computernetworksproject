@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -7,6 +8,17 @@
 #include <sys/stat.h>
 #include <iostream>
 using namespace std;
+
+string trackerFilePath;
+
+struct TrackerFile {
+	string filename;
+	string filesize;
+	string description;
+	string md5;
+	string ip;
+	string port;
+};
 
 void createSharedFileLoc();
 
@@ -20,6 +32,8 @@ void handle_createtracker_req(int sock_child, char* read_msg);
 
 char* createTrackerFile(char* read_msg);
 
+TrackerFile parseCreateTrackerMsg(char* read_msg);
+
 void handle_list_req(int sock_child);
 
 char* xtrct_fname(char* msg, char* something);
@@ -30,10 +44,7 @@ void handle_get_req(int sock_child, char* fname);
 
 void tokenize_updatemsg(char* msg);
 
-
 void handle_updatetracker_req(int sock_child);
-
-string trackerFilePath;
 
 int main(){
    int sockid;
@@ -53,7 +64,7 @@ void createSharedFileLoc() {
 	char cwd[100];
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
-
+		exit(1);
 	}
 
 	trackerFilePath = cwd;
@@ -148,6 +159,35 @@ void handle_createtracker_req(int sock_child, char* read_msg) {
 }
 
 char* createTrackerFile(char* read_msg) {
-	char* filename;
-	
+	struct TrackerFile tf = parseCreateTrackerMsg(read_msg);
+	FILE *fp;
+	char* err = "<createtracker fail>";
+
+	fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "r");
+	if(fp != NULL) {
+		return "<createtracker ferr>";
+	} else {
+		fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "w");
+	}
+
+	if(fputs((tf.filename + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.filesize + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.description + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.md5 + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.ip + '\n').c_str(), fp) == EOF) { return err;}
+	if(fputs((tf.port + '\n').c_str(), fp) == EOF) { return err;}
+	return "<createtracker succ>";
+}
+
+TrackerFile parseCreateTrackerMsg(char* read_msg) {
+	char* msg = read_msg;
+	struct TrackerFile tf;
+
+	tf.filename = *strtok(msg, " ");
+	tf.filesize = *strtok(msg, " ");
+	tf.description = *strtok(msg, " ");
+	tf.md5 = *strtok(msg, " ");
+	tf.ip = *strtok(msg, " ");
+	tf.port = *strtok(msg, " ");
+	return tf;
 }
