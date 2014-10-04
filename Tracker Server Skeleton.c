@@ -16,20 +16,24 @@ void listenForConnections(int sockid);
 
 void peer_handler(int sock_child);
 
+void handle_createtracker_req(int sock_child, char* read_msg);
+
+char* createTrackerFile(char* read_msg);
+
 void handle_list_req(int sock_child);
 
 char* xtrct_fname(char* msg, char* something);
 
 void handle_get_req(int sock_child, char* fname);
 
-void tokenize_createmsg(char* msg);
+// void tokenize_createmsg(char* msg);
 
 void tokenize_updatemsg(char* msg);
 
-void handle_createtracker_req(int sock_child);
 
 void handle_updatetracker_req(int sock_child);
 
+string trackerFilePath;
 
 int main(){
    int sockid;
@@ -47,18 +51,15 @@ int main(){
 void createSharedFileLoc() {
 	struct stat st = {0};
 	char cwd[100];
-	string path;
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
 
 	}
 
-	path = cwd;
-	path += "/trackers";
-	cout << path << endl;
-	if(stat(path.c_str(), &st)) {
-		cout<< "making dir" << endl;
-		mkdir(path.c_str(), 0700);
+	trackerFilePath = cwd;
+	trackerFilePath += "/trackers";
+	if(stat(trackerFilePath.c_str(), &st)) {
+		mkdir(trackerFilePath.c_str(), 0700);
 	}
 }
 
@@ -124,8 +125,8 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		handle_get_req(sock_child, fname);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
-		tokenize_createmsg(read_msg);
-		handle_createtracker_req(sock_child);
+		// tokenize_createmsg(read_msg);
+		handle_createtracker_req(sock_child, read_msg);
 		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
@@ -136,5 +137,17 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 }//end client handler function
 
 void handle_list_req(int sock_child) {
+
+}
+
+void handle_createtracker_req(int sock_child, char* read_msg) {
+	char* msg;
+	if((write(sock_child, (msg = createTrackerFile(read_msg)), sizeof(msg))) < 0){//inform the server of the list request
+		printf("Send_request  failure\n"); exit(0);
+	}
+}
+
+char* createTrackerFile(char* read_msg) {
+	char* filename;
 	
 }
