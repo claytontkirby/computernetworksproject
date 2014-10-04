@@ -36,17 +36,17 @@ char* createTrackerFile(char* read_msg);
 
 TrackerFile parseCreateTrackerMsg(char* read_msg);
 
-// void handle_list_req(int sock_child);
+void handle_list_req(int sock_child);
 
-// char* xtrct_fname(char* msg, char* something);
+char* xtrct_fname(char* msg, char* something);
 
-// void handle_get_req(int sock_child, char* fname);
+void handle_get_req(int sock_child, char* fname);
 
 // void tokenize_createmsg(char* msg);
 
-// void tokenize_updatemsg(char* msg);
+void tokenize_updatemsg(char* msg);
 
-// void handle_updatetracker_req(int sock_child);
+void handle_updatetracker_req(int sock_child);
 
 int main(){
    int sockid;
@@ -137,7 +137,7 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		// fname = xtrct_fname(read_msg, " ");// extract filename from the command		
+		fname = xtrct_fname(read_msg, " ");// extract filename from the command		
 		// handle_get_req(sock_child, fname);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
@@ -182,6 +182,14 @@ char* createTrackerFile(char* read_msg) {
 	if(fputs((tf.md5 + '\n'), fp) == EOF) { return err;}
 	if(fputs((tf.ip + '\n'), fp) == EOF) { return err;}
 	if(fputs((tf.port + '\n'), fp) == EOF) { return err;}
+
+	free(tf.filename);
+	free(tf.filesize);
+	free(tf.description);
+	free(tf.md5);
+	free(tf.ip);
+	free(tf.port);
+
 	return "<createtracker succ>";
 }
 
@@ -189,17 +197,24 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
 	struct TrackerFile tf;
 
-	tf.filename = strtok(msg, " ");
-	tf.filesize = strtok(msg, " ");
-	tf.description = strtok(msg, " ");
-	tf.md5 = strtok(msg, " ");
-	tf.ip = strtok(msg, " ");
-	tf.port = strtok(msg, " ");
+	tf.filesize = (char *)malloc(100);
+	tf.description = (char *)malloc(100);
+	tf.md5 = (char *)malloc(100);
+	tf.ip = (char *)malloc(100);
+	tf.port = (char *)malloc(100);
+
+	sscanf(msg,"%s %s %s %s %s %s", tf.filename, tf.filesize, tf.description, tf.md5, tf.ip, tf.port);
+
 	return tf;
 }
 
-char* xtrct_fname(char* msg, char* something) {
+char* xtrct_fname(char* read_msg, char* something) {
+	char* msg = read_msg;
+	char* fname = (char *)malloc(100);
+	
+	sscanf(msg,"%*s %s", fname);
 
+	return fname;
 }
 
 void handle_get_req(int sock_child, char* fname) {
