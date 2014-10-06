@@ -60,46 +60,53 @@ int main(int argc,char *argv[]){
 void processCreateTrackerCommand(int sockid) {
 	// int list_req=htons(LIST);
 	string list_req = "createtracker";
-	char* msg;
+	char msg[100];
 	DIR* FD;
 	struct dirent* in_file;
-	char const * DirName = "/tmp";
+	char const * DirName = "/Users/clayton/Desktop/peerfiles";
 	char * FullName;  	
 	struct stat statbuf;
+	char buffer[20];
+	int length;
 
 	if(NULL == (FD = opendir("/Users/clayton/Desktop/peerfiles"))) {
 		cout << "error" << endl;
 	}
 
 	while((in_file = readdir(FD))) {
-		FullName = (char*) malloc(strlen(DirName) + strlen(in_file->d_name) + 2);
-		strcpy(FullName, DirName);
-		strcat(FullName, "/");
-		strcat(FullName, in_file->d_name);
-		stat(FullName, &statbuf);
-		free(FullName);
+		if(strncmp(in_file->d_name, ".", 1) != 0) {
+			FullName = (char*) malloc(strlen(DirName) + strlen(in_file->d_name) + 2);
+			strcpy(FullName, DirName);
+			strcat(FullName, "/");
+			strcat(FullName, in_file->d_name);
+			stat(FullName, &statbuf);
+			free(FullName);
 
-		list_req += " ";
-		list_req += in_file->d_name;
-		list_req += " ";
-		list_req += statbuf.st_size;
-		list_req += " ";
-		list_req += "description";
-		list_req += " ";
-		list_req += "132451325987";
-		list_req += " ";
-		list_req += "127.0.0.1";
-		list_req += " ";
-		list_req += "5000";
+			list_req += " ";
+			list_req += in_file->d_name;
+			list_req += " ";
+			snprintf(buffer, 20, "%d", statbuf.st_size);
+			list_req += buffer;
+			list_req += " ";
+			list_req += "description";
+			list_req += " ";
+			list_req += "132451325987";
+			list_req += " ";
+			list_req += "127.0.0.1";
+			list_req += " ";
+			list_req += "5000";
 
-		if((write(sockid,list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
-			printf("Send_request  failure\n"); exit(0);
+			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
+				printf("Send_request failure\n"); exit(0);
+			}
+
+		    if((length = read(sockid, &msg, 100) < 0)){// read what server has said
+				printf("Read  failure\n"); exit(0); 
+			}
+
+			msg[length] = '\0';
+			cout << msg << endl;
 		}
-
-	    if((read(sockid, &msg, sizeof(msg)))< 0){// read what server has said
-			printf("Read  failure\n"); exit(0); 
-		}
-
 	}
 	
 	close(sockid);

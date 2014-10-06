@@ -144,7 +144,6 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
 		// tokenize_createmsg(read_msg);
-		cout << "received create msg" << endl;
 		handle_createtracker_req(sock_child, read_msg);
 		
 	}
@@ -162,55 +161,57 @@ void handle_list_req(int sock_child) {
 void handle_createtracker_req(int sock_child, char* read_msg) {
 	char* msg;
 
-	cout << "handling create tracker msg" << endl;
+	msg = createTrackerFile(read_msg);
 
-	if((write(sock_child, (msg = createTrackerFile(read_msg)), sizeof(msg))) < 0){//inform the server of the list request
+	cout << msg << endl;
+
+	if((write(sock_child, msg, 100)) < 0){//inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
 	}
 }
 
 char* createTrackerFile(char* read_msg) {
-	struct TrackerFile tf = parseCreateTrackerMsg(read_msg);
+	TrackerFile tf = parseCreateTrackerMsg(read_msg);
 	FILE *fp;
 	char* err = "<createtracker fail>";
 
-	fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "r");
-	if(fp != NULL) {
+	fp = fopen((trackerFilePath + "/" + tf.filename + ".txt").c_str(), "r");
+
+	if(fp) {
 		return "<createtracker ferr>";
 	} else {
-		fp = fopen((trackerFilePath + "/" + tf.filename).c_str(), "w");
-	}
+		fp = fopen((trackerFilePath + "/" + tf.filename + ".txt").c_str(), "w");
+	}	
 
-	cout << "creating tracker file" << endl;
+	if(fputs((tf.filename), fp) == EOF) { return err;}
+	fputs("\n", fp);
+	if(fputs((tf.filesize), fp) == EOF) { return err;}
+	fputs("\n", fp);
+	if(fputs((tf.description), fp) == EOF) { return err;}
+	fputs("\n", fp);
+	if(fputs((tf.md5), fp) == EOF) { return err;}
+	fputs("\n", fp);
+	if(fputs((tf.ip), fp) == EOF) { return err;}
+	fputs("\n", fp);
+	if(fputs((tf.port), fp) == EOF) { return err;}
 
-	if(fputs((tf.filename + '\n'), fp) == EOF) { return err;}
-	if(fputs((tf.filesize + '\n'), fp) == EOF) { return err;}
-	if(fputs((tf.description + '\n'), fp) == EOF) { return err;}
-	if(fputs((tf.md5 + '\n'), fp) == EOF) { return err;}
-	if(fputs((tf.ip + '\n'), fp) == EOF) { return err;}
-	if(fputs((tf.port + '\n'), fp) == EOF) { return err;}
-
-	free(tf.filename);
-	free(tf.filesize);
-	free(tf.description);
-	free(tf.md5);
-	free(tf.ip);
-	free(tf.port);
+	// fflush(fp);
+	fclose(fp);
 
 	return "<createtracker succ>";
 }
 
 TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
-	struct TrackerFile tf;
+	TrackerFile tf;
 
-	tf.filesize = (char *)malloc(100);
-	tf.description = (char *)malloc(100);
-	tf.md5 = (char *)malloc(100);
-	tf.ip = (char *)malloc(100);
-	tf.port = (char *)malloc(100);
-
-	sscanf(msg,"%s %s %s %s %s %s", tf.filename, tf.filesize, tf.description, tf.md5, tf.ip, tf.port);
+	strtok(msg, " ");
+	tf.filename = strtok(NULL, " ");
+	tf.filesize = strtok(NULL, " ");
+	tf.description = strtok(NULL, " ");
+	tf.md5 = strtok(NULL, " ");
+	tf.ip = strtok(NULL, " ");
+	tf.port = strtok(NULL, " ");
 
 	return tf;
 }
