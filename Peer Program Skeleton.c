@@ -12,6 +12,10 @@
 #include <dirent.h>
 using namespace std;
 
+string peerFilePath;
+
+void makeSharedDirectory();
+
 void processCreateTrackerCommand(int sockid);
 
 void processUpdateTrackerCommand(int sockid);
@@ -25,7 +29,9 @@ int main(int argc,char *argv[]){
 	int server_port=5000;  // you should instead read from configuration file   
 	struct sockaddr_in server_addr;
 	int sockid;
-        
+     
+	makeSharedDirectory();
+
 	cout << "creating socket" << endl;
 
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
@@ -57,26 +63,41 @@ int main(int argc,char *argv[]){
     
 }
 
+void makeSharedDirectory() {
+	char cwd[100];
+	struct stat st = {0};
+
+	if(getcwd(cwd, sizeof(cwd))==NULL) {
+		exit(1);
+	}
+
+	peerFilePath = cwd;
+	peerFilePath += "/shared";
+	if(stat(peerFilePath.c_str(), &st)) {
+		mkdir(peerFilePath.c_str(), 0700);
+	}
+}
+
 void processCreateTrackerCommand(int sockid) {
 	// int list_req=htons(LIST);
 	string list_req = "createtracker";
 	char msg[100];
 	DIR* FD;
 	struct dirent* in_file;
-	char const * DirName = "/Users/clayton/Desktop/peerfiles";
+	// char const * DirName = "/Users/clayton/Desktop/peerfiles";
 	char * FullName;  	
 	struct stat statbuf;
 	char buffer[20];
 	int length;
 
-	if(NULL == (FD = opendir("/Users/clayton/Desktop/peerfiles"))) {
+	if(NULL == (FD = opendir(peerFilePath.c_str()))) {
 		cout << "error" << endl;
 	}
 
 	while((in_file = readdir(FD))) {
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
-			FullName = (char*) malloc(strlen(DirName) + strlen(in_file->d_name) + 2);
-			strcpy(FullName, DirName);
+			FullName = (char*) malloc(strlen(peerFilePath.c_str()) + strlen(in_file->d_name) + 2);
+			strcpy(FullName, peerFilePath.c_str());
 			strcat(FullName, "/");
 			strcat(FullName, in_file->d_name);
 			stat(FullName, &statbuf);
