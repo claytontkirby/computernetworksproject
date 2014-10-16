@@ -26,10 +26,12 @@ void processGetCommand(int sockid);
 
 int main(int argc,char *argv[]){	
    	char server_address[50];
-	int server_port=5000;  // you should instead read from configuration file   
+	int server_port=5001;  // you should instead read from configuration file   
 	struct sockaddr_in server_addr;
 	int sockid;
-     
+    
+	std::system("clear");
+
 	makeSharedDirectory();
 
 	cout << "creating socket" << endl;
@@ -79,12 +81,9 @@ void makeSharedDirectory() {
 }
 
 void processCreateTrackerCommand(int sockid) {
-	// int list_req=htons(LIST);
 	string list_req = "createtracker";
-	char msg[100];
 	DIR* FD;
 	struct dirent* in_file;
-	// char const * DirName = "/Users/clayton/Desktop/peerfiles";
 	char * FullName;  	
 	struct stat statbuf;
 	char buffer[20];
@@ -95,6 +94,7 @@ void processCreateTrackerCommand(int sockid) {
 	}
 
 	while((in_file = readdir(FD))) {
+		char msg[100];		
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(peerFilePath.c_str()) + strlen(in_file->d_name) + 2);
 			strcpy(FullName, peerFilePath.c_str());
@@ -103,6 +103,7 @@ void processCreateTrackerCommand(int sockid) {
 			stat(FullName, &statbuf);
 			free(FullName);
 
+			cout << "creating " << in_file->d_name << endl;
 			list_req += " ";
 			list_req += in_file->d_name;
 			list_req += " ";
@@ -126,7 +127,8 @@ void processCreateTrackerCommand(int sockid) {
 			}
 
 			msg[length] = '\0';
-			cout << msg << endl;
+			list_req="";
+			cout << "msg " << msg << endl;		
 		}
 	}
 	
@@ -152,16 +154,21 @@ void processUpdateTrackerCommand(int sockid) {
 }
 
 void processListCommand(int sockid) {
-	char* list_req = "list";
-	char* msg;
-	if((write(sockid,list_req, sizeof(list_req))) < 0){//inform the server of the list request
+	string list_req = "REQ LIST";
+	char msg[1000];
+	int length;
+
+	if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
 	}
 
-    if((read(sockid, &msg, sizeof(msg)))< 0){// read what server has said
+    if((length = read(sockid, &msg, 1000))< 0){// read what server has said
 		printf("Read  failure\n"); exit(0); 
 	}
 	
+	msg[length] = '\0';
+	cout << msg << endl;
+
 	close(sockid);
 	printf("Connection closed\n");
     exit(0);
