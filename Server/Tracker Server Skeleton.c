@@ -13,9 +13,12 @@
 #include <arpa/inet.h>
 #include <fstream>
 #include <string>
+#include <fcntl.h>
 using namespace std;
 
 string trackerFilePath;
+string sharedFilePath;
+int MAX_SEND_LENGTH = 1028;
 
 struct TrackerFile {
 	string filename;
@@ -30,7 +33,7 @@ vector<TrackerFile> trackerFiles;
 struct sockaddr_in server_addr;
 struct sockaddr_in client_addr;
 
-void createSharedFileLoc();
+void createTrackerFileLoc();
 
 void loadTrackerFiles();
 
@@ -48,9 +51,11 @@ TrackerFile parseCreateTrackerMsg(char* read_msg);
 
 void handle_list_req(int sock_child);
 
-char* xtrct_fname(char* msg, char* something);
+void handle_download(int sock_child, char* read_msg);
 
-void handle_get_req(int sock_child, char* fname);
+string parseGetRequest(char* read_msg);
+
+void handle_get_req(int sock_child, char* read_msg);
 
 // void tokenize_createmsg(char* msg);
 
@@ -61,35 +66,44 @@ void handle_updatetracker_req(int sock_child);
 int main(){
    int sockid;
 
-   createSharedFileLoc();
+   std::system("clear");
+
+   createTrackerFileLoc();
 
    loadTrackerFiles();
 
    sockid = setupSocketConnections();
 
    while(true){
-   	cout << "listening" << endl;
+   	cout << endl;
+   	cout << "Tracker server listening for incoming connections..." << endl;
    	if (listen(sockid, 2) < 0){ //(parent) process listens at sockid and check error
 	   printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
     }  
    	listenForConnections(sockid);
-   }
-          
-} // end of main  
+   }         
+}
     
-void createSharedFileLoc() {
-	struct stat st = {0};
+void createTrackerFileLoc() {
 	char cwd[100];
+	struct stat st = {0};
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
 		exit(1);
 	}
 
+	sharedFilePath = cwd;
 	trackerFilePath = cwd;
+	sharedFilePath += "/shared";
 	trackerFilePath += "/trackers";
+	if(stat(sharedFilePath.c_str(), &st)) {
+		mkdir(sharedFilePath.c_str(), 0700);
+	}
+
 	if(stat(trackerFilePath.c_str(), &st)) {
 		mkdir(trackerFilePath.c_str(), 0700);
 	}
+	sharedFilePath += "/";
 	trackerFilePath += "/";
 }
 
@@ -97,7 +111,6 @@ void createSharedFileLoc() {
 void loadTrackerFiles() {
 	DIR* FD;
 	struct dirent* in_file;
-	// struct stat statbuf;
 
 	if(NULL == (FD = opendir(trackerFilePath.c_str()))) {
 		cout << "error" << endl;
@@ -147,9 +160,7 @@ int setupSocketConnections() {
 
    if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){//bind and check error
 	   printf("bind  failure\n"); exit(0); 
-   }
-    
-   printf("Tracker SERVER READY TO LISTEN INCOMING REQUEST.... \n");
+   }  
 
    return sockid;                                      
 }
@@ -181,63 +192,31 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	length=read(sock_child, &read_msg, 100);
 	read_msg[length]='\0';
 
-	cout << "message received: " << read_msg << endl;
+	cout << "Message received: " << read_msg << endl;
 
 	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
 		handle_list_req(sock_child);// handle list request
 		printf("list request handled.\n");
 	}
 	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
-		fname = xtrct_fname(read_msg, " ");// extract filename from the command		
-		// handle_get_req(sock_child, fname);
+		handle_get_req(sock_child, read_msg);
 	}
 	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
-		// tokenize_createmsg(read_msg);
-		handle_createtracker_req(sock_child, read_msg);
-		
+		handle_createtracker_req(sock_child, read_msg);		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
 		// tokenize_updatemsg(read_msg);
 		// handle_updatetracker_req(sock_child);		
+	} else if(strstr(read_msg, "download") != NULL) {
+		handle_download(sock_child, read_msg);
 	}
 	
 }//end client handler function
 
-void handle_list_req(int sock_child) {
-	string msg = "<REP LIST ";
-	msg = msg + std::to_string(trackerFiles.size());
-	msg = msg + ">\n";
-
-	for(int i = 0; i < trackerFiles.size(); i++) {
-		msg = msg + "<";
-		msg += std::to_string(i+1);
-		msg += " ";
-		msg += trackerFiles[i].filename;
-		msg += " ";
-		msg += trackerFiles[i].filesize;
-		msg += " ";
-		msg += trackerFiles[i].description;
-		msg += " ";
-		msg += trackerFiles[i].md5;
-		msg += " ";
-		msg += trackerFiles[i].ip;
-		msg += " ";
-		msg += trackerFiles[i].port;
-		msg += ">\n";
-	}
-
-	msg = msg + "<REP LIST END>\n";
-
-	cout << "list response: " << msg << endl;
-	if(write(sock_child, msg.c_str(), 1000) < 0) {
-		printf("Send_request failure\n"); exit(0);
-	}
-}
-
 void handle_createtracker_req(int sock_child, char* read_msg) {
 	string msg;
 	msg = createTrackerFile(read_msg);
-	cout << "create tracker response: " << msg << endl;
+	cout << "Sending create tracker response..." << endl;
 	if((write(sock_child, msg.c_str(), 100)) < 0){//inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
 	}
@@ -248,12 +227,12 @@ string createTrackerFile(char* read_msg) {
 	FILE *fp;
 	string err = "<createtracker fail>";
 
-	fp = fopen((trackerFilePath + "/" + tf.filename + ".txt").c_str(), "r");
+	fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "r");
 
 	if(fp) {
 		return "<createtracker ferr>";
 	} else {
-		fp = fopen((trackerFilePath + "/" + tf.filename + ".txt").c_str(), "w");
+		fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "w");
 	}	
 
 
@@ -291,22 +270,99 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	return tf;
 }
 
-char* xtrct_fname(char* read_msg, char* something) {
+void handle_list_req(int sock_child) {
+	string msg = "<REP LIST ";
+	msg = msg + std::to_string(trackerFiles.size());
+	msg = msg + ">\n";
+
+	for(int i = 0; i < trackerFiles.size(); i++) {
+		msg = msg + "<";
+		msg += std::to_string(i+1);
+		msg += " ";
+		msg += trackerFiles[i].filename;
+		msg += " ";
+		msg += trackerFiles[i].filesize;
+		msg += " ";
+		msg += trackerFiles[i].description;
+		msg += " ";
+		msg += trackerFiles[i].md5;
+		msg += " ";
+		msg += trackerFiles[i].ip;
+		msg += " ";
+		msg += trackerFiles[i].port;
+		msg += ">\n";
+	}
+
+	msg = msg + "<REP LIST END>\n";
+
+	cout << "Sending list response..." << endl;
+	if(write(sock_child, msg.c_str(), 1000) < 0) {
+		printf("Send_request failure\n"); exit(0);
+	}
+}
+
+void handle_get_req(int sock_child, char* read_msg) {
+	string filename = parseGetRequest(read_msg);
+	TrackerFile tf;
+	char sendBuf[MAX_SEND_LENGTH];
+	char filePathBuf[100];
+	int fileBlockSize;
+
+	strcpy(filePathBuf, trackerFilePath.c_str());
+	strcat(filePathBuf, filename.c_str());
+	strcat(filePathBuf, ".track");
+	FILE *fs = fopen(filePathBuf, "rb");
+	if(fs == 0) {
+		cout << "error opening file" << endl;
+	}
+
+	bzero(sendBuf, MAX_SEND_LENGTH);
+	while((fileBlockSize = fread(sendBuf, sizeof(char), MAX_SEND_LENGTH, fs))) {
+		cout << "Sending tracker file to peer..." << endl;
+		if(send(sock_child, sendBuf, fileBlockSize, 0) < 0) {
+			cout << "Error sending tracker file" << endl;
+		}
+		bzero(sendBuf, MAX_SEND_LENGTH);
+	}
+	fclose(fs);
+
+	for(int i = 0; i < trackerFiles.size(); i++) {
+		if(trackerFiles[i].filename == filename) {
+			tf = trackerFiles[i];
+		}
+	}
+}
+
+string parseGetRequest(char* read_msg) {
 	char* msg = read_msg;
-	char* fname = (char *)malloc(100);
-	
-	sscanf(msg,"%*s %s", fname);
 
-	return fname;
+	strtok(msg, " ");	
+	return strtok(NULL, " ");
 }
 
-void handle_get_req(int sock_child, char* fname) {
+void handle_download(int sock_child, char* read_msg) {
+	strtok(read_msg, " ");
+	string filename = strtok(NULL, " ");
+	int sendBuf[MAX_SEND_LENGTH];
+	char filePathBuf[100];
+	int fileBlockSize;
 
+	strcpy(filePathBuf, sharedFilePath.c_str());
+	strcat(filePathBuf, filename.c_str());
+	FILE *fs = fopen(filePathBuf, "r");
+	if(fs == NULL) {
+		cout << "error opening file" << endl;
+	}
+
+	bzero(sendBuf, MAX_SEND_LENGTH);
+	while((fileBlockSize = fread(sendBuf, sizeof(int), MAX_SEND_LENGTH, fs))) {
+		if(send(sock_child, sendBuf, fileBlockSize, 0) < 0) {
+			cout << "Error sending tracker file" << endl;
+		}
+		bzero(sendBuf, MAX_SEND_LENGTH);
+	}
+	fclose(fs);
 }
-
-// void tokenize_createmsg(char* msg) {
-
-//}
 
 void tokenize_updatemsg(char* msg) {
 
