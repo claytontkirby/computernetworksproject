@@ -33,6 +33,8 @@ struct Config {
 	int update_time;
 };
 
+Config configFile;
+
 void createDirectories();
 
 void loadConfig();
@@ -54,12 +56,10 @@ void processListCommand(int sockid);
 void processGetCommand(int sockid, string file);
 
 int main(int argc,char *argv[]){	
-   	// char server_address[50];
 	int sockid;
 	string command;
-	Config configFile;
 
-	loadConfig(configFile);
+	loadConfig();
     
 	system("clear");
 
@@ -130,7 +130,7 @@ void createDirectories() {
 	trackerFilePath += "/";
 }
 
-void loadConfig(Config& configFile) {
+void loadConfig() {
 	ifstream fin("config.txt");
 	string line;
 	while (getline(fin, line)) {
@@ -150,15 +150,15 @@ void loadConfig(Config& configFile) {
 int setupConnections() {
 	int sockid;
 	struct sockaddr_in server_addr;
-	int server_port=5001;
+	// int server_port=5001;
 
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);
 	}
 
     server_addr.sin_family = AF_INET;//host byte order
-    server_addr.sin_port = htons(server_port);// convert to network byte order
-    server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    server_addr.sin_port = htons(configFile.port_num);// convert to network byte order
+    server_addr.sin_addr.s_addr = inet_addr(configFile.ip_addr.c_str());
     if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
 		cout << errno << endl; printf("Cannot connect to server\n"); exit(0);
 	}
@@ -267,7 +267,7 @@ void processUpdateTrackerCommand(int sockid) {
 				printf("Read failure\n"); exit(0); 
 			}
 
-			msg[101] = '\0';
+			msg[100] = '\0';
 			list_req="";
 			cout << "Receiving update tracker response: " << msg << endl;
 			close(sockid);
