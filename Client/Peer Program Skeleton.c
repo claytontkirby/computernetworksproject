@@ -260,7 +260,7 @@ void processUpdateTrackerCommand(int sockid) {
 			list_req += " ";			
 			list_req += buffer;
 			list_req += " ";
-			list_req += configFile.port_num;
+			list_req += configFile.ip_addr;
 			list_req += " ";
 			list_req += port;
 
@@ -341,8 +341,8 @@ string requestTrackerFile(int sockid, string file) {
 	bzero(messageBody, MAX_RECV_LENGTH);
 	int j = 0;
 	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-		cout << recvBuf << endl;
-		for(int i = 0; i < MAX_RECV_LENGTH; i++) {			
+		cout << "this is recvbuf: " << recvBuf << endl;
+		for(int i = 0; i < strlen(recvBuf); i++) {			
 			if(recvBuf[i] == '<') {
 				isBody = false;
 			}
@@ -354,10 +354,11 @@ string requestTrackerFile(int sockid, string file) {
 				isBody = true;
 			}
 		}
-		write_size = fwrite(messageBody, sizeof(char), fr_block_size, fr);
+		cout << "this is message buff: " <<  messageBody << endl;		
 		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
 
+	write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
 	fclose(fr);
 	close(sockid);
 	return fpath;
@@ -366,7 +367,7 @@ string requestTrackerFile(int sockid, string file) {
 TrackerFile parseTrackerFile(string tfile) {
 	ifstream in;
 	TrackerFile tf;
-
+	cout << tfile << endl;
 	if(in.good()) {
 		in.open(tfile.c_str());
 	}

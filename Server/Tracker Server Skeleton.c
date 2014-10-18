@@ -79,7 +79,7 @@ string updateTrackerFile(char* read_msg);
 
 int parseUpdateTrackerMsg(char* read_msg);
 
-bool writeTrackerFile(TrackerFile tf);
+bool writeTrackerFile(TrackerFile &tf);
 
 int main(){
 	int sockid;
@@ -280,19 +280,35 @@ string createTrackerFile(char* read_msg) {
 	FILE *fp;
 	string err = "<createtracker fail>";
 
+	cout << "starting create tracker file" << endl;
+
+	cout << "opening file at path " << trackerFilePath << tf.filename << ".track" << endl;
+
 	fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "r");
 
+	cout << "file opened" << endl;
+
 	if(fp) {
+		cout << "file exists" << endl;
 		for(int i = 0; i < trackerFiles.size(); i++) {
+			cout << "lvl 1" << endl;
 			if(trackerFiles[i].filename == tf.filename) {
-				for(int j = 0; j < trackerFiles[i].peerlist.size(); i++) {
+				cout << "lvl 2" << endl;
+				cout << "tracker file " << i << endl;
+				for(int j = 0; j < trackerFiles[i].peerlist.size(); j++) {
+					cout << "lvl 3" << endl;
+					cout << trackerFiles[i].peerlist[j].ip << endl;
+					cout << tf.peerlist[0].ip << endl;
 					if(trackerFiles[i].peerlist[j].ip == tf.peerlist[0].ip) {
+						cout << "peer " << j << endl;
 						return "<createtracker ferr>";
 					}
 				}
 			}
-		}		
+		}
 		
+		cout << "adding peer info" << endl;
+
 		fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "a");
 		if(fputs((tf.peerlist[0].ip.c_str()), fp) == EOF) { return err;}
 		fputs(":", fp);
@@ -304,6 +320,8 @@ string createTrackerFile(char* read_msg) {
 		fputs(":", fp);
 		if(fputs((tf.peerlist[0].timestamp.c_str()), fp) == EOF) { return err;}
 	} else {
+		cout << "file doesn't exist" << endl;
+		// fclose(fp);
 		if(!writeTrackerFile(tf)) {
 			return "<createtracker fail>";
 		}
@@ -311,6 +329,8 @@ string createTrackerFile(char* read_msg) {
 
 	fclose(fp);
 	trackerFiles.push_back(tf);
+
+	cout << "tracker file created" << endl;
 
 	return "<createtracker succ>";
 }
@@ -320,6 +340,8 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char time[100];
 	TrackerFile tf;
 	PeerInfo pi;
+
+	cout << "starting parse" << endl;
 
 	strtok(msg, " ");
 	tf.filename = strtok(NULL, " ");
@@ -333,6 +355,8 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	sprintf(time, "%.f", difftime(timer, mktime(&newyear))); 
 	pi.timestamp = time;
 	tf.peerlist.push_back(pi);
+
+	cout << "parsed finished" << endl;
 
 	return tf;
 }
@@ -443,6 +467,7 @@ void handle_download(int sock_child, char* read_msg) {
 	strcpy(filePathBuf, sharedFilePath.c_str());
 	strcat(filePathBuf, filename.c_str());
 	FILE *fs = fopen(filePathBuf, "r+b");
+	cout << filePathBuf << endl;
 	if(fs == NULL) {
 		cout << "error opening file" << endl; exit(1);
 	}
@@ -470,31 +495,36 @@ void handle_updatetracker_req(int sock_child, char* read_msg) {
 	}
 }
 
-bool writeTrackerFile(TrackerFile tf) {
-	FILE *fp;
-	fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "w");
-		if(fputs((tf.filename.c_str()), fp) == EOF) { return false;}
-		fputs("\n", fp);
-		if(fputs((tf.filesize.c_str()), fp) == EOF) { return false;}
-		fputs("\n", fp);
-		if(fputs((tf.description.c_str()), fp) == EOF) { return false;}
-		fputs("\n", fp);
-		if(fputs((tf.md5.c_str()), fp) == EOF) { return false;}
-		fputs("\n", fp);
-		for(int i = 0; i < tf.peerlist.size(); i++) {
-			if(fputs((tf.peerlist[i].ip.c_str()), fp) == EOF) { return false;}
-			fputs(":", fp);
-			if(fputs((tf.peerlist[i].port.c_str()), fp) == EOF) { return false;}
-			fputs(":", fp);
-			if(fputs(tf.peerlist[i].start_byte.c_str(), fp) == EOF) { return false;}
-			fputs(":", fp);
-			if(fputs(tf.filesize.c_str(), fp) == EOF) { return false;}
-			fputs(":", fp);
-			if(fputs(tf.peerlist[i].timestamp.c_str(), fp) == EOF) { return false;}
-			cout << tf.peerlist[i].timestamp << endl;
-		}
+bool writeTrackerFile(TrackerFile &tf) {
+	FILE *fd;
+	cout << "READY TO OPEN" << endl;
+	fd = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "w");
+	cout << "error: " << errno << endl;
+	cout << "file name " << tf.filename << endl;
+	if(fputs((tf.filename.c_str()), fd) == EOF) { return false;}
+	fputs("\n", fd);
+	if(fputs((tf.filesize.c_str()), fd) == EOF) { return false;}
+	fputs("\n", fd);
+	if(fputs((tf.description.c_str()), fd) == EOF) { return false;}
+	fputs("\n", fd);
+	if(fputs((tf.md5.c_str()), fd) == EOF) { return false;}
+	fputs("\n", fd);
+	for(int i = 0; i < tf.peerlist.size(); i++) {
+		if(fputs((tf.peerlist[i].ip.c_str()), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs((tf.peerlist[i].port.c_str()), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs(tf.peerlist[i].start_byte.c_str(), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs(tf.filesize.c_str(), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs(tf.peerlist[i].timestamp.c_str(), fd) == EOF) { return false;}
+		cout << tf.peerlist[i].timestamp << endl;
+	}
 
-	fclose(fp);
+	if(fd != NULL) {
+		fclose(fd);
+	}
 
 	return true;
 }
@@ -552,4 +582,5 @@ int parseUpdateTrackerMsg(char* read_msg) {
 			}			
 		}
 	}
+	return -1;
 }
