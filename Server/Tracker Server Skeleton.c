@@ -1,21 +1,24 @@
+#define _GNU_SOURCE
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fstream>
+#include <fcntl.h>
+#include <iostream>
+#include <ifaddrs.h>
+#include <linux/if_link.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <errno.h>
 #include <sys/dir.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
-#include <iostream>
-#include <vector>
-#include <arpa/inet.h>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <fcntl.h>
+#include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
+#include <vector>
 using namespace std;
 
 string trackerFilePath;
@@ -79,26 +82,39 @@ int parseUpdateTrackerMsg(char* read_msg);
 bool writeTrackerFile(TrackerFile tf);
 
 int main(){
-   int sockid;
+	int sockid;
+	int i, family, s;
+	struct ifaddrs *ifa, *ifaddr;
+	char host[NI_MAXHOST];
+	bzero(host, NI_MAXHOST);
 
-   system("clear");
+	system("clear");
 
-   setupTimer();
+	setupTimer();
 
-   createFileDirectories();
+	createFileDirectories();
 
-   loadTrackerFiles();
+	loadTrackerFiles();
 
-   sockid = setupSocketConnections();
+	sockid = setupSocketConnections();
 
-   while(true){
-   	cout << endl;
-   	cout << "Tracker server listening for incoming connections..." << endl;
-   	if (listen(sockid, 2) < 0){ //(parent) process listens at sockid and check error
-	   printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
-    }
-   	listenForConnections(sockid);
-   }         
+	getifaddrs(&ifaddr);
+	cout << "Tracker server network info..." << endl;
+	for(ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		family = ifa->ifa_addr->sa_family;
+		s = getnameinfo(ifa->ifa_addr, (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6), host, 100, NULL, 0, NI_NUMERICHOST);
+		cout << "IP: " << host << endl;
+	}
+
+	while(true){
+		cout << endl;
+		cout << "Tracker server listening for incoming connections..." << endl;
+		
+		if (listen(sockid, 2) < 0){ //(parent) process listens at sockid and check error
+			printf(" Tracker  SERVER CANNOT LISTEN\n"); exit(0);
+		}
+		listenForConnections(sockid);
+	}         
 }
     
 void createFileDirectories() {
@@ -173,7 +189,7 @@ void setupTimer() {
 int setupSocketConnections() {
    // struct sockaddr_in server_addr;
    int sockid;
-   int server_port=5001;
+   // int server_port=5001;
 
    if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
 	   printf("socket cannot be created \n"); exit(0); 
@@ -182,10 +198,10 @@ int setupSocketConnections() {
    //socket created at this stage
    //now associate the socket with local port to allow listening incoming connections
    server_addr.sin_family = AF_INET;// assign address family
-   server_addr.sin_port = htons(server_port);//change server port to NETWORK BYTE ORDER
-   server_addr.sin_addr.s_addr = htons(INADDR_ANY);
+   server_addr.sin_port = htons(0);//change server port to NETWORK BYTE ORDER
+   server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
    client_addr.sin_family = AF_INET;
-   client_addr.sin_port = htons(server_port);
+   client_addr.sin_port = htons(0);
    client_addr.sin_addr.s_addr = htons(INADDR_ANY); 
 
    if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){//bind and check error
