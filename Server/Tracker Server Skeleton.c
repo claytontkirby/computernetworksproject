@@ -85,6 +85,8 @@ int main(){
 	int sockid;
 	int i, family, s;
 	struct ifaddrs *ifa, *ifaddr;
+	struct sockaddr_in sin;
+	socklen_t len = sizeof(sin);
 	char host[NI_MAXHOST];
 	bzero(host, NI_MAXHOST);
 
@@ -96,7 +98,17 @@ int main(){
 
 	loadTrackerFiles();
 
-	sockid = setupSocketConnections();
+	sockid = setupSocketConnections();	
+
+	if(getsockname(sockid, (struct sockaddr *)&sin, &len) == -1) {
+		cout << "Error getting port from socket" << endl;
+	} else {
+		cout << "Port: " << ntohs(sin.sin_port) << endl;
+	}
+
+	client_addr.sin_family = AF_INET;
+	client_addr.sin_port = htons(0);
+	client_addr.sin_addr.s_addr = htons(INADDR_ANY); 
 
 	getifaddrs(&ifaddr);
 	cout << "Tracker server network info..." << endl;
@@ -199,10 +211,7 @@ int setupSocketConnections() {
    //now associate the socket with local port to allow listening incoming connections
    server_addr.sin_family = AF_INET;// assign address family
    server_addr.sin_port = htons(0);//change server port to NETWORK BYTE ORDER
-   server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-   client_addr.sin_family = AF_INET;
-   client_addr.sin_port = htons(0);
-   client_addr.sin_addr.s_addr = htons(INADDR_ANY); 
+   server_addr.sin_addr.s_addr = htonl(INADDR_ANY);   
 
    if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){//bind and check error
 	   printf("bind  failure\n"); exit(0); 
