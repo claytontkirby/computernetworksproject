@@ -49,7 +49,7 @@ int main(int argc,char *argv[]){
 	int sockid;
 	string command;
     
-	std::system("clear");
+	system("clear");
 
 	createDirectories();
 
@@ -64,7 +64,7 @@ int main(int argc,char *argv[]){
 		cout << "4) Get File" << endl;
 		cout << "5) Exit" << endl;
 		cin >> command;
-		std::system("clear");
+		system("clear");
 
 		if(command == "1"){
 			cout << "Sending create tracker request..." << endl;
@@ -76,7 +76,7 @@ int main(int argc,char *argv[]){
 			cout << "Sending list request..." << endl;
 			processListCommand(sockid);
 		} else if(command == "4") {
-			std::system("clear");
+			system("clear");
 			cout << "Name of file to download: ";
 			cin >> command;
 			processGetCommand(sockid, command);

@@ -12,6 +12,7 @@
 #include <vector>
 #include <arpa/inet.h>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <fcntl.h>
 #include <time.h>
@@ -80,7 +81,7 @@ bool writeTrackerFile(TrackerFile tf);
 int main(){
    int sockid;
 
-   std::system("clear");
+   system("clear");
 
    setupTimer();
 
@@ -313,12 +314,17 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 
 void handle_list_req(int sock_child) {
 	string msg = "<REP LIST ";
-	msg = msg + std::to_string(trackerFiles.size());
+	stringstream ss;
+	ss << trackerFiles.size();
+	ss.flush();
+	msg = msg + ss.str();
 	msg = msg + ">\n";
 
 	for(int i = 0; i < trackerFiles.size(); i++) {
 		msg = msg + "<";
-		msg += std::to_string(i+1);
+		ss << (i+1);
+		msg += ss.str();
+		ss.flush();
 		msg += " ";
 		msg += trackerFiles[i].filename;
 		msg += " ";
