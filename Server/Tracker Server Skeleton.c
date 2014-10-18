@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <ifaddrs.h>
-#include <linux/if_link.h>
+// #include <linux/if_link.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sstream>
@@ -332,8 +332,8 @@ void handle_list_req(int sock_child) {
 	string msg = "<REP LIST ";
 	stringstream ss;
 	ss << trackerFiles.size();
-	ss.flush();
 	msg = msg + ss.str();
+	ss.flush();
 	msg = msg + ">\n";
 
 	for(int i = 0; i < trackerFiles.size(); i++) {
