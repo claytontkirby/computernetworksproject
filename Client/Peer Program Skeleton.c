@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <fstream>
+#include <sstream>
 using namespace std;
 
 string sharedFilePath;
@@ -26,7 +27,15 @@ struct TrackerFile {
 	string port;
 };
 
+struct Config {
+	int port_num;
+	string ip_addr;
+	int update_time;
+};
+
 void createDirectories();
+
+void loadConfig();
 
 int setupConnections();
 
@@ -48,6 +57,9 @@ int main(int argc,char *argv[]){
    	// char server_address[50];
 	int sockid;
 	string command;
+	Config configFile;
+
+	loadConfig(configFile);
     
 	system("clear");
 
@@ -116,6 +128,23 @@ void createDirectories() {
 	}
 	sharedFilePath += "/";
 	trackerFilePath += "/";
+}
+
+void loadConfig(Config& configFile) {
+	ifstream fin("config.txt");
+	string line;
+	while (getline(fin, line)) {
+		istringstream sin(line.substr(line.find("=") + 1));
+		if (line.find("PORT") != -1) {
+			sin >> configFile.port_num;
+		}		
+		else if (line.find("IPADDRESS") != -1) {
+			sin >> configFile.ip_addr;
+		}
+		else if (line.find("UPDATETIME") != -1) {
+			sin >> configFile.update_time;
+		}
+	}
 }
 
 int setupConnections() {
