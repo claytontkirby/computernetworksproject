@@ -15,7 +15,7 @@ using namespace std;
 
 string sharedFilePath;
 string trackerFilePath;
-int MAX_RECV_LENGTH = 1028;
+int MAX_RECV_LENGTH = 1024;
 
 struct TrackerFile {
 	string filename;
@@ -55,30 +55,34 @@ int main(int argc,char *argv[]){
 
 	while(true) {
 		sockid = setupConnections();
+		cout << "Connected to server and ready for communication..." << endl;
 		cout << endl;
 		cout << "Choose an action:" << endl;
-		cout << "1) Create Tracker" << endl;
-		cout << "2) List Tracker Files from Server" << endl;
-		cout << "3) Get File" << endl;
-		cout << "4) Exit" << endl;
+		cout << "1) Create Trackers" << endl;
+		cout << "2) Update Trackers" << endl;
+		cout << "3) List Tracker Files from Server" << endl;
+		cout << "4) Get File" << endl;
+		cout << "5) Exit" << endl;
 		cin >> command;
 		std::system("clear");
 
 		if(command == "1"){
 			cout << "Sending create tracker request..." << endl;
 			processCreateTrackerCommand(sockid);
-		} else if(command == "updatetracker") {
-			processUpdateTrackerCommand(sockid);
 		} else if(command == "2") {
-			processListCommand(sockid);
+			cout << "Sending update tracker request..." << endl;
+			processUpdateTrackerCommand(sockid);
 		} else if(command == "3") {
+			cout << "Sending list request..." << endl;
+			processListCommand(sockid);
+		} else if(command == "4") {
 			std::system("clear");
 			cout << "Name of file to download: ";
 			cin >> command;
 			processGetCommand(sockid, command);
 			cout << "File download complete." << endl;
 			sleep(1);
-		} else if(command == "4") {
+		} else if(command == "5") {
 			close(sockid);
 			printf("Connection Closed");
 			exit(0);
@@ -123,8 +127,6 @@ int setupConnections() {
 		printf("socket cannot be created\n"); exit(0);
 	}
 
-	cout << "Socket Created" << endl;
-
     server_addr.sin_family = AF_INET;//host byte order
     server_addr.sin_port = htons(server_port);// convert to network byte order
     server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
@@ -132,13 +134,10 @@ int setupConnections() {
 		cout << errno << endl; printf("Cannot connect to server\n"); exit(0);
 	}
 
-	cout << "Connected Socket" << endl;
-
 	return sockid;
 }
 
-void processCreateTrackerCommand(int sockid) {
-	string list_req = "createtracker";
+void processCreateTrackerCommand(int sockid) {	
 	DIR* FD;
 	struct dirent* in_file;
 	char * FullName;  	
@@ -151,7 +150,9 @@ void processCreateTrackerCommand(int sockid) {
 	}
 
 	while((in_file = readdir(FD))) {
+		string list_req = "createtracker";
 		char msg[101];		
+
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
 			strcpy(FullName, sharedFilePath.c_str());
@@ -159,7 +160,6 @@ void processCreateTrackerCommand(int sockid) {
 			strcat(FullName, in_file->d_name);
 			stat(FullName, &statbuf);
 			free(FullName);
-
 			list_req += " ";
 			list_req += in_file->d_name;
 			list_req += " ";
@@ -174,6 +174,7 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 			list_req += "5000";
 
+			cout << list_req << endl;
 			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
 				printf("Send_request failure\n"); exit(0);
 			}
@@ -184,7 +185,9 @@ void processCreateTrackerCommand(int sockid) {
 
 			msg[100] = '\0';
 			list_req="";
-			cout << "Receiving create tracker response: " << msg << endl;		
+			cout << "Receiving create tracker response: " << msg << endl;
+			close(sockid);		
+			sockid = setupConnections();	
 		}
 	}
 	
@@ -192,14 +195,55 @@ void processCreateTrackerCommand(int sockid) {
 }
 
 void processUpdateTrackerCommand(int sockid) {
-	char* list_req = "updatetracker";
-	char* msg;
-	if((write(sockid,list_req, sizeof(list_req))) < 0){//inform the server of the list request
-		printf("Send_request  failure\n"); exit(0);
+	DIR* FD;
+	struct dirent* in_file;
+	char * FullName;  	
+	struct stat statbuf;
+	char buffer[20];
+	int length;
+
+	if(NULL == (FD = opendir(sharedFilePath.c_str()))) {
+		cout << "error" << endl;
 	}
 
-    if((read(sockid, &msg, sizeof(msg)))< 0){// read what server has said
-		printf("Read  failure\n"); exit(0); 
+	while((in_file = readdir(FD))) {
+		string list_req = "updatetracker";
+		char msg[101];		
+		if(strncmp(in_file->d_name, ".", 1) != 0) {
+			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
+			strcpy(FullName, sharedFilePath.c_str());
+			strcat(FullName, "/");
+			strcat(FullName, in_file->d_name);
+			stat(FullName, &statbuf);
+			free(FullName);
+			snprintf(buffer, 20, "%d", statbuf.st_size);
+
+			list_req += " ";
+			list_req += in_file->d_name;
+			list_req += " ";
+			list_req += "0";
+			list_req += " ";			
+			list_req += buffer;
+			list_req += " ";
+			list_req += "127.0.0.1";
+			list_req += " ";
+			list_req += "5000";
+
+			cout << list_req << endl;
+			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
+				printf("Send_request failure\n"); exit(0);
+			}
+
+		    if((length = read(sockid, &msg, 100) < 0)){// read what server has said
+				printf("Read failure\n"); exit(0); 
+			}
+
+			msg[101] = '\0';
+			list_req="";
+			cout << "Receiving update tracker response: " << msg << endl;
+			close(sockid);
+			sockid = setupConnections();
+		}
 	}
 	
 	close(sockid);
@@ -228,6 +272,7 @@ void processGetCommand(int sockid, string file) {
 	string tfile = requestTrackerFile(sockid, file);
 	TrackerFile tf = parseTrackerFile(tfile);
 
+	sockid = setupConnections();
 	downloadFile(tf, sockid);
 	close(sockid);
 }
@@ -236,8 +281,10 @@ string requestTrackerFile(int sockid, string file) {
 	string list_req = "get ";
 	char fpath[100];
 	char recvBuf[MAX_RECV_LENGTH];
+	char messageBody[MAX_RECV_LENGTH];
 	int fr_block_size;
 	int write_size;
+	bool isBody;
 	TrackerFile tf;
 
 	list_req += file;
@@ -256,13 +303,28 @@ string requestTrackerFile(int sockid, string file) {
 	}
 
 	bzero(recvBuf, MAX_RECV_LENGTH);
+	bzero(messageBody, MAX_RECV_LENGTH);
+	int j = 0;
 	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-		write_size = fwrite(recvBuf, sizeof(char), fr_block_size, fr);
-		bzero(recvBuf, MAX_RECV_LENGTH);
-
-		fclose(fr);
+		cout << recvBuf << endl;
+		for(int i = 0; i < MAX_RECV_LENGTH; i++) {			
+			if(recvBuf[i] == '<') {
+				isBody = false;
+			}
+			if(isBody) {
+				messageBody[j] = recvBuf[i];
+				j++;
+			}
+			if(recvBuf[i] == '\n') {
+				isBody = true;
+			}
+		}
+		write_size = fwrite(messageBody, sizeof(char), fr_block_size, fr);
+		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
 
+	fclose(fr);
+	close(sockid);
 	return fpath;
 }
 
@@ -294,8 +356,8 @@ void downloadFile(TrackerFile tf, int sockid) {
 
 	strcpy(fpath, sharedFilePath.c_str());
 	strcat(fpath, tf.filename.c_str());	
-	FILE *fd = fopen(fpath, "a");
-
+	FILE *fd = fopen(fpath, "wb");
+	cout << fpath << endl;
 	if(fd == NULL) {
 		cout << "File cannot be opened" << endl;
 		exit(1);
@@ -309,13 +371,10 @@ void downloadFile(TrackerFile tf, int sockid) {
 	while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
 		write_size = fwrite(recvBuf, sizeof(int), fd_block_size, fd);
 		bzero(recvBuf, MAX_RECV_LENGTH);
-
-		fclose(fd);
 	}
+
+	fseek(fd, 0, SEEK_END);
+	cout << "Received " << ftell(fd) << " bytes..." << endl;
+	rewind(fd);
+	fclose(fd);
 }
-
-
-
-
-
-
