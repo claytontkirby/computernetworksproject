@@ -181,7 +181,10 @@ void processCreateTrackerCommand(int sockid) {
 	while((in_file = readdir(FD))) {
 		string list_req = "createtracker";
 		char msg[101];		
-
+		stringstream ss;
+		ss << configFile.port_num;
+		string port = ss.str();		
+	
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
 			strcpy(FullName, sharedFilePath.c_str());
@@ -199,9 +202,9 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 			list_req += "132451325987";
 			list_req += " ";
-			list_req += "127.0.0.1";
+			list_req += configFile.ip_addr;
 			list_req += " ";
-			list_req += "5000";
+			list_req += port;
 
 			cout << list_req << endl;
 			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
@@ -230,6 +233,9 @@ void processUpdateTrackerCommand(int sockid) {
 	struct stat statbuf;
 	char buffer[20];
 	int length;
+	stringstream ss;
+	ss << configFile.port_num;
+	string port = ss.str();
 
 	if(NULL == (FD = opendir(sharedFilePath.c_str()))) {
 		cout << "error" << endl;
@@ -254,9 +260,9 @@ void processUpdateTrackerCommand(int sockid) {
 			list_req += " ";			
 			list_req += buffer;
 			list_req += " ";
-			list_req += "127.0.0.1";
+			list_req += configFile.port_num;
 			list_req += " ";
-			list_req += "5000";
+			list_req += port;
 
 			cout << list_req << endl;
 			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
