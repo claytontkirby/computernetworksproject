@@ -457,7 +457,7 @@ string parseGetRequest(char* read_msg) {
 void handle_download(int sock_child, char* read_msg) {
 	strtok(read_msg, " ");
 	string filename = strtok(NULL, " ");
-	int sendBuf[MAX_SEND_LENGTH];
+	char sendBuf[MAX_SEND_LENGTH];
 	char filePathBuf[100];
 	int fileBlockSize;
 	int bytes_sent;
@@ -474,7 +474,7 @@ void handle_download(int sock_child, char* read_msg) {
 	cout << "Sending " << ftell(fs) << " bytes..." << endl;
 	rewind(fs);
 
-	while((fileBlockSize = fread(sendBuf, sizeof(int), MAX_SEND_LENGTH, fs))) {
+	while((fileBlockSize = fread(sendBuf, sizeof(char), MAX_SEND_LENGTH, fs))) {
 		if((bytes_sent = send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
 			cout << "Error sending tracker file" << endl;
 		}

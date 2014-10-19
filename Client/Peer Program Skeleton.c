@@ -381,7 +381,7 @@ TrackerFile parseTrackerFile(string tfile) {
 
 void downloadFile(TrackerFile tf, int sockid) {
 	char fpath[100];
-	int recvBuf[MAX_RECV_LENGTH];
+	char recvBuf[MAX_RECV_LENGTH];
 	int fd_block_size;
 	int write_size;
 	string download_req = "download ";
@@ -402,7 +402,7 @@ void downloadFile(TrackerFile tf, int sockid) {
 	bzero(recvBuf, MAX_RECV_LENGTH);
 	cout << "Downloading..." << endl;
 	while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-		write_size = fwrite(recvBuf, sizeof(int), fd_block_size, fd);
+		write_size = fwrite(recvBuf, sizeof(char), fd_block_size, fd);
 		bzero(recvBuf, MAX_RECV_LENGTH);
 	}
 
