@@ -341,7 +341,6 @@ string requestTrackerFile(int sockid, string file) {
 	bzero(messageBody, MAX_RECV_LENGTH);
 	int j = 0;
 	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-		cout << "this is recvbuf: " << recvBuf << endl;
 		for(int i = 0; i < strlen(recvBuf); i++) {			
 			if(recvBuf[i] == '<') {
 				isBody = false;
@@ -354,7 +353,6 @@ string requestTrackerFile(int sockid, string file) {
 				isBody = true;
 			}
 		}
-		cout << "this is message buff: " <<  messageBody << endl;		
 		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
 
@@ -367,7 +365,6 @@ string requestTrackerFile(int sockid, string file) {
 TrackerFile parseTrackerFile(string tfile) {
 	ifstream in;
 	TrackerFile tf;
-	cout << tfile << endl;
 	if(in.good()) {
 		in.open(tfile.c_str());
 	}
@@ -393,7 +390,6 @@ void downloadFile(TrackerFile tf, int sockid) {
 	strcpy(fpath, sharedFilePath.c_str());
 	strcat(fpath, tf.filename.c_str());	
 	FILE *fd = fopen(fpath, "wb");
-	cout << fpath << endl;
 	if(fd == NULL) {
 		cout << "File cannot be opened" << endl;
 		exit(1);
@@ -404,6 +400,7 @@ void downloadFile(TrackerFile tf, int sockid) {
 	}
 
 	bzero(recvBuf, MAX_RECV_LENGTH);
+	cout << "Downloading..." << endl;
 	while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
 		write_size = fwrite(recvBuf, sizeof(int), fd_block_size, fd);
 		bzero(recvBuf, MAX_RECV_LENGTH);
