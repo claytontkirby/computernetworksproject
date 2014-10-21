@@ -183,7 +183,8 @@ void processCreateTrackerCommand(int sockid) {
 		char msg[101];		
 		stringstream ss;
 		ss << configFile.port_num;
-		string port = ss.str();		
+		string port = ss.str();
+		string md5Sum;		
 	
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
@@ -200,7 +201,20 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 			list_req += "description";
 			list_req += " ";
-			list_req += "132451325987";
+
+			//Calculate the md5 checksum and insert it into tracker file
+			char funct_call[50];	//store function call for file open
+			char md5[100];
+			strcpy(funct_call, "md5sum ");
+			strcat(funct_call, "shared/");					
+			strcat(funct_call, in_file->d_name);	//append file name to function call
+			FILE * pipe;
+			pipe = popen(funct_call, "r");	//call md5 on file
+			fgets(md5, 100, pipe);	//store output from md5sum call
+			md5Sum = strtok(md5, " ");	
+			
+			list_req += md5Sum;
+
 			list_req += " ";
 			list_req += configFile.ip_addr;
 			list_req += " ";
