@@ -17,6 +17,8 @@ using namespace std;
 string sharedFilePath;
 string trackerFilePath;
 int MAX_RECV_LENGTH = 1024;
+int CLIENT_ID = 0;
+int CHUNK_SIZE = 0;
 
 struct TrackerFile {
 	string filename;
@@ -51,83 +53,123 @@ void processCreateTrackerCommand(int sockid);
 
 void processUpdateTrackerCommand(int sockid);
 
-void processListCommand(int sockid);
+string processListCommand(int sockid);
 
 void processGetCommand(int sockid, string file);
 
-int main(int argc,char *argv[]){	
+void main_rcv(int sock_id);
+
+void main_snd(int sock_id);
+
+int main(int argc, char *argv[]){	
 	int sockid;
 	string command;
 
-	loadConfig();
+	// loadConfig();
     
 	system("clear");
 
+	sockid = setupConnections();
+
+	CLIENT_ID = atoi(argv[2]);
 	createDirectories();
 
-	while(true) {
-		sockid = setupConnections();
-		cout << "Connected to server and ready for communication..." << endl;
-		cout << endl;
-		cout << "Choose an action:" << endl;
-		cout << "1) Create Trackers" << endl;
-		cout << "2) Update Trackers" << endl;
-		cout << "3) List Tracker Files from Server" << endl;
-		cout << "4) Get File" << endl;
-		cout << "5) Exit" << endl;
-		cin >> command;
-		system("clear");
+	if(strcmp(argv[1], "rcv") == 0)
+		main_rcv(sockid);
+	else if(strcmp(argv[1], "snd") == 0)
+		main_snd(sockid);
+	else
+		printf("No such client type.\n"); exit(1);
 
-		if(command == "1"){
-			cout << "Sending create tracker request..." << endl;
-			processCreateTrackerCommand(sockid);
-		} else if(command == "2") {
-			cout << "Sending update tracker request..." << endl;
-			processUpdateTrackerCommand(sockid);
-		} else if(command == "3") {
-			cout << "Sending list request..." << endl;
-			processListCommand(sockid);
-		} else if(command == "4") {
-			system("clear");
-			cout << "Name of file to download: ";
-			cin >> command;
-			processGetCommand(sockid, command);
-			cout << "File download complete." << endl;
-			sleep(1);
-		} else if(command == "5") {
-			close(sockid);
-			printf("Connection Closed");
-			exit(0);
-		} else {
-			printf("Unrecognized command");
-		}
-		cout << endl << endl;
-	}
+	// while(true) {
+	// 	sockid = setupConnections();
+	// 	cout << "Connected to server and ready for communication..." << endl;
+	// 	cout << endl;
+	// 	cout << "Choose an action:" << endl;
+	// 	cout << "1) Create Trackers" << endl;
+	// 	cout << "2) Update Trackers" << endl;
+	// 	cout << "3) List Tracker Files from Server" << endl;
+	// 	cout << "4) Get File" << endl;
+	// 	cout << "5) Exit" << endl;
+	// 	cin >> command;
+	// 	system("clear");
+
+	// 	if(command == "1"){
+	// 		cout << "Sending create tracker request..." << endl;
+	// 		processCreateTrackerCommand(sockid);
+	// 	} else if(command == "2") {
+	// 		cout << "Sending update tracker request..." << endl;
+	// 		processUpdateTrackerCommand(sockid);
+	// 	} else if(command == "3") {
+	// 		cout << "Sending list request..." << endl;
+	// 		processListCommand(sockid);
+	// 	} else if(command == "4") {
+	// 		system("clear");
+	// 		cout << "Name of file to download: ";
+	// 		cin >> command;
+	// 		processGetCommand(sockid, command);
+	// 		cout << "File download complete." << endl;
+	// 		sleep(1);
+	// 	} else if(command == "5") {
+	// 		close(sockid);
+	// 		printf("Connection Closed");
+	// 		exit(0);
+	// 	} else {
+	// 		printf("Unrecognized command");
+	// 	}
+	// 	cout << endl << endl;
+	// }
     
     return 0;
 }
 
+void main_rcv(int sock_id) {
+	pthread_t t1, t2, t3, t4, t5;
+	string msg = "";
+	sharedFilePath += CLIENT_ID;
+	cout << "main rcv" << endl;
+	while(msg.find("picture-wallpaper.jpg") == string::npos) {
+		cout << "looping" << endl;	
+		msg = processListCommand(sock_id);		
+		sock_id = setupConnections();
+	}
+
+	processGetCommand(sock_id, "picture-wallpaper.jpg");
+}
+
+void main_snd(int sock_id) {
+	sharedFilePath += CLIENT_ID;
+	processCreateTrackerCommand(sock_id);
+}
+
 void createDirectories() {
-	char cwd[100];
+	char cwd[100];	
+	stringstream ss;	
 	struct stat st = {0};
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
 		exit(1);
 	}
 
-	sharedFilePath = cwd;
-	trackerFilePath = cwd;
-	sharedFilePath += "/shared";
-	trackerFilePath += "/trackers";
+	string path(cwd);
+	path.erase(path.length() - 3, path.length());
+	// trackerFilePath = cwd;
+	sharedFilePath += path;
+	sharedFilePath += "test_clients/client_";
+	ss << CLIENT_ID;
+	sharedFilePath += ss.str();
+	// trackerFilePath += "/trackers";
 	if(stat(sharedFilePath.c_str(), &st)) {
+		// cout << "mkdir" << endl;
 		mkdir(sharedFilePath.c_str(), 0700);
+		// printf("Could not determine filepath: %s\n", sharedFilePath.c_str());
 	}
 
-	if(stat(trackerFilePath.c_str(), &st)) {
-		mkdir(trackerFilePath.c_str(), 0700);
-	}
+	// if(stat(trackerFilePath.c_str(), &st)) {
+	// 	mkdir(trackerFilePath.c_str(), 0700);
+	// }
 	sharedFilePath += "/";
-	trackerFilePath += "/";
+	// trackerFilePath += "/";
 }
 
 void loadConfig() {
@@ -157,8 +199,8 @@ int setupConnections() {
 	}
 
     server_addr.sin_family = AF_INET;//host byte order
-    server_addr.sin_port = htons(configFile.port_num);// convert to network byte order
-    server_addr.sin_addr.s_addr = inet_addr(configFile.ip_addr.c_str());
+    server_addr.sin_port = htons(3456);// convert to network byte order
+    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
 		cout << errno << endl; printf("Cannot connect to server\n"); exit(0);
 	}
@@ -174,8 +216,10 @@ void processCreateTrackerCommand(int sockid) {
 	char buffer[20];
 	int length;
 
+	// cout << sharedFilePath << endl;
+	printf("%s\n", sharedFilePath.c_str());
 	if(NULL == (FD = opendir(sharedFilePath.c_str()))) {
-		cout << "error" << endl;
+		cout << "error: "<< errno << endl; exit(1);
 	}
 
 	while((in_file = readdir(FD))) {
@@ -197,6 +241,7 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += in_file->d_name;
 			list_req += " ";
 			snprintf(buffer, 20, "%d", statbuf.st_size);
+			// calculateChunk(buffer);						
 			list_req += buffer;
 			list_req += " ";
 			list_req += "description";
@@ -218,7 +263,7 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 			list_req += configFile.ip_addr;
 			list_req += " ";
-			list_req += port;
+			list_req += port;		
 
 			cout << list_req << endl;
 			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
@@ -232,12 +277,22 @@ void processCreateTrackerCommand(int sockid) {
 			msg[100] = '\0';
 			list_req="";
 			cout << "Receiving create tracker response: " << msg << endl;
-			close(sockid);		
+			close(sockid);				
 			sockid = setupConnections();	
 		}
 	}
 	
 	close(sockid);
+}
+
+string calculateChunk(char buffer[]) {
+	int i;	
+	sscanf(buffer, "%d", &i);
+
+	CHUNK_SIZE = i / 5;
+
+	i = CHUNK_SIZE * CLIENT_ID;
+	
 }
 
 void processUpdateTrackerCommand(int sockid) {
@@ -298,7 +353,7 @@ void processUpdateTrackerCommand(int sockid) {
 	close(sockid);
 }
 
-void processListCommand(int sockid) {
+string processListCommand(int sockid) {
 	string list_req = "REQ LIST";
 	char msg[1001];
 	int length;
@@ -313,8 +368,9 @@ void processListCommand(int sockid) {
 	
 	msg[length+1] = '\0';
 	cout << msg << endl;
-
 	close(sockid);
+
+	return msg;
 }
 
 void processGetCommand(int sockid, string file) {

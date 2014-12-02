@@ -23,6 +23,9 @@ using namespace std;
 string trackerFilePath;
 string sharedFilePath;
 int MAX_SEND_LENGTH = 1024;
+int IP = 0;
+int PORT = 0;
+int numThreads = 0;
 time_t timer;
 struct tm newyear;
 
@@ -82,16 +85,23 @@ int parseUpdateTrackerMsg(char* read_msg);
 
 bool writeTrackerFile(TrackerFile &tf);
 
-int main(){
+int main(int argc, char* argv[]){
 	int sockid;
+
+	if(argv[1] == "localhost") 
+		IP = INADDR_LOOPBACK;
+	else
+		IP = atoi(argv[1]);
+	PORT = atoi(argv[2]);
+	numThreads = atoi(argv[3]);
 
 	system("clear");
 
 	setupTimer();
 
-	createFileDirectories();
+	// createFileDirectories();
 
-	loadTrackerFiles();
+	// loadTrackerFiles();
 
 	sockid = setupSocketConnections();	
 
@@ -187,7 +197,7 @@ int setupSocketConnections() {
    //socket created at this stage
    //now associate the socket with local port to allow listening incoming connections
    server_addr.sin_family = AF_INET;// assign address family
-   server_addr.sin_port = htons(0);//change server port to NETWORK BYTE ORDER
+   server_addr.sin_port = htons(PORT);//change server port to NETWORK BYTE ORDER
    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);   
 
    if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){//bind and check error
@@ -240,19 +250,22 @@ void outputNetworkInfo(int sockid) {
 
 void listenForConnections(int sockid) {
 	int sockchild;
-	// pid_t pid;
+	pid_t pid;
 
 	if ((sockchild = accept(sockid ,(struct sockaddr *) &client_addr, (socklen_t*) &client_addr ))==-1){ /* accept connection and create a socket descriptor for actual work */
 		   printf("Tracker Cannot accept...\n"); exit(0); 
 	}
 
-	// if ((pid=fork())==0) {//New child process will serve the requester client. separate child will serve separate client
-	   // close(sockid);   //child does not need listener
-	   peer_handler(sockchild);//child is serving the client.	   
-	   close(sockchild);// printf("\n 1. closed");
-	   // exit(0);         // kill the process. child process all done with work
-    // }
-
+	if(numThreads > 0) {		
+		if ((pid=fork())==0) {//New child process will serve the requester client. separate child will serve separate client
+		   numThreads--;
+		   close(sockid);   //child does not need listener
+		   peer_handler(sockchild);//child is serving the client.	   
+		   close(sockchild);// printf("\n 1. closed");	   
+		   numThreads++;
+		   exit(0);         // kill the process. child process all done with work
+	    }
+	}
 	// close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
 
