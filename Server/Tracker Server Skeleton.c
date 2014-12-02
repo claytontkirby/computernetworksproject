@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <ifaddrs.h>
-// #include <linux/if_link.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sstream>
@@ -321,6 +320,7 @@ string createTrackerFile(char* read_msg) {
 		if(fputs((tf.peerlist[0].end_byte.c_str()), fp) == EOF) { return err;}
 		fputs(":", fp);
 		if(fputs((tf.peerlist[0].timestamp.c_str()), fp) == EOF) { return err;}
+		fputs(" ", fp);
 	} else {
 		if(!writeTrackerFile(tf)) {
 			return "<createtracker fail>";
@@ -513,6 +513,7 @@ bool writeTrackerFile(TrackerFile &tf) {
 		if(fputs(tf.filesize.c_str(), fd) == EOF) { return false;}
 		fputs(":", fd);
 		if(fputs(tf.peerlist[i].timestamp.c_str(), fd) == EOF) { return false;}
+		fputs(" ", fd);
 	}
 
 	if(fd != NULL) {
