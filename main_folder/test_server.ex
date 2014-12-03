@@ -1,3 +1,3 @@
 #!/bin/bash
 
-server.out localhost 3456 10
+./server.out localhost 3456 10
