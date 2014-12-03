@@ -19,6 +19,8 @@ string trackerFilePath;
 int MAX_RECV_LENGTH = 1024;
 int CLIENT_ID = 0;
 int CHUNK_SIZE = 0;
+string IPADDRESS = "127.0.0.1";
+string PORT = "3456";
 
 struct TrackerFile {
 	string filename;
@@ -127,7 +129,6 @@ void main_rcv(int sock_id) {
 	pthread_t t1, t2, t3, t4, t5;
 	string msg = "";
 	sharedFilePath += CLIENT_ID;
-	cout << "main rcv" << endl;
 	while(msg.find("picture-wallpaper.jpg") == string::npos) {
 		cout << "looping" << endl;	
 		msg = processListCommand(sock_id);		
@@ -138,37 +139,35 @@ void main_rcv(int sock_id) {
 }
 
 void main_snd(int sock_id) {
-	sharedFilePath += CLIENT_ID;
+	// sharedFilePath += CLIENT_ID;
 	processCreateTrackerCommand(sock_id);
 }
 
 void createDirectories() {
 	char cwd[100];	
 	stringstream ss;	
-	struct stat st = {0};
+	// struct stat st = {0};
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
 		exit(1);
 	}
 
-	string path(cwd);
-	path.erase(path.length() - 3, path.length());
-	// trackerFilePath = cwd;
-	sharedFilePath += path;
-	sharedFilePath += "test_clients/client_";
+	sharedFilePath = cwd;
+	// sharedFilePath.erase(sharedFilePath.length() - 3, 3);
+	sharedFilePath += "/test_clients/client_";
 	ss << CLIENT_ID;
 	sharedFilePath += ss.str();
 	// trackerFilePath += "/trackers";
-	if(stat(sharedFilePath.c_str(), &st)) {
+	// if(stat(sharedFilePath.c_str(), &st)) {
 		// cout << "mkdir" << endl;
-		mkdir(sharedFilePath.c_str(), 0700);
+		// mkdir(sharedFilePath.c_str(), 0700);
 		// printf("Could not determine filepath: %s\n", sharedFilePath.c_str());
-	}
+	// }
+	sharedFilePath += "/";
 
 	// if(stat(trackerFilePath.c_str(), &st)) {
 	// 	mkdir(trackerFilePath.c_str(), 0700);
 	// }
-	sharedFilePath += "/";
 	// trackerFilePath += "/";
 }
 
@@ -217,24 +216,27 @@ void processCreateTrackerCommand(int sockid) {
 	int length;
 
 	// cout << sharedFilePath << endl;
-	printf("%s\n", sharedFilePath.c_str());
-	if(NULL == (FD = opendir(sharedFilePath.c_str()))) {
+	// printf("%s\n", sharedFilePath.c_str());
+	FD = opendir(sharedFilePath.c_str());
+	// FD = opendir("/Users/clayton/Documents/Git/computernetworksproject/main_folder/test_clients/client_1/");
+	if(FD == NULL) {
 		cout << "error: "<< errno << endl; exit(1);
 	}
 
-	while((in_file = readdir(FD))) {
+	while((in_file = readdir(FD))) {		
 		string list_req = "createtracker";
 		char msg[101];		
 		stringstream ss;
-		ss << configFile.port_num;
-		string port = ss.str();
-		string md5Sum;		
+		// ss << configFile.port_num;
+		// string port = ss.str();
+		// string md5Sum;		
 	
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
 			strcpy(FullName, sharedFilePath.c_str());
-			strcat(FullName, "/");
+			// strcat(FullName, "/");
 			strcat(FullName, in_file->d_name);
+			cout << FullName << endl;
 			stat(FullName, &statbuf);
 			free(FullName);
 			list_req += " ";
@@ -248,22 +250,22 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 
 			//Calculate the md5 checksum and insert it into tracker file
-			char funct_call[50];	//store function call for file open
-			char md5[100];
-			strcpy(funct_call, "md5sum ");
-			strcat(funct_call, "shared/");					
-			strcat(funct_call, in_file->d_name);	//append file name to function call
-			FILE * pipe;
-			pipe = popen(funct_call, "r");	//call md5 on file
-			fgets(md5, 100, pipe);	//store output from md5sum call
-			md5Sum = strtok(md5, " ");	
+			// char funct_call[50];	//store function call for file open
+			// char md5[100];
+			// strcpy(funct_call, "md5sum ");
+			// strcat(funct_call, "shared/");					
+			// strcat(funct_call, in_file->d_name);	//append file name to function call
+			// FILE * pipe;
+			// pipe = popen(funct_call, "r");	//call md5 on file
+			// fgets(md5, 100, pipe);	//store output from md5sum call
+			// md5Sum = strtok(md5, " ");	
 			
-			list_req += md5Sum;
+			// list_req += md5Sum;
 
+			// list_req += " ";
+			list_req += IPADDRESS;
 			list_req += " ";
-			list_req += configFile.ip_addr;
-			list_req += " ";
-			list_req += port;		
+			list_req += PORT;		
 
 			cout << list_req << endl;
 			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request

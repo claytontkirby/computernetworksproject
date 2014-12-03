@@ -99,7 +99,7 @@ int main(int argc, char* argv[]){
 
 	setupTimer();
 
-	// createFileDirectories();
+	createFileDirectories();
 
 	// loadTrackerFiles();
 
@@ -126,19 +126,20 @@ void createFileDirectories() {
 		exit(1);
 	}
 
-	sharedFilePath = cwd;
+	// sharedFilePath = cwd;
 	trackerFilePath = cwd;
-	sharedFilePath += "/shared";
-	trackerFilePath += "/trackers";
-	if(stat(sharedFilePath.c_str(), &st)) {
-		mkdir(sharedFilePath.c_str(), 0700);
-	}
+	// trackerFilePath.erase(trackerFilePath.length() - 3, 3);
+	// sharedFilePath += "/shared";
+	trackerFilePath += "/test_server";
+	// if(stat(sharedFilePath.c_str(), &st)) {
+	// 	mkdir(sharedFilePath.c_str(), 0700);
+	// }
 
 	if(stat(trackerFilePath.c_str(), &st)) {
 		mkdir(trackerFilePath.c_str(), 0700);
 	}
-	sharedFilePath += "/";
-	trackerFilePath += "/";
+	// sharedFilePath += "/";
+	// trackerFilePath += "/";
 }
 
 void loadTrackerFiles() {
@@ -310,6 +311,7 @@ string createTrackerFile(char* read_msg) {
 	FILE *fp;
 	string err = "<createtracker fail>";
 
+	cout << trackerFilePath << endl;
 	fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "r");
 
 	if(fp) {
@@ -349,16 +351,18 @@ string createTrackerFile(char* read_msg) {
 }
 
 TrackerFile parseCreateTrackerMsg(char* read_msg) {
+	cout << "0" << endl;
 	char* msg = read_msg;
 	char time[100];
 	TrackerFile tf;
 	PeerInfo pi;
 
+	cout << "1" << endl;
 	strtok(msg, " ");
 	tf.filename = strtok(NULL, " ");
 	tf.filesize = strtok(NULL, " ");
 	tf.description = strtok(NULL, " ");
-	tf.md5 = strtok(NULL, " ");
+	// tf.md5 = strtok(NULL, " ");
 	pi.ip = strtok(NULL, " ");
 	pi.port = strtok(NULL, " ");
 	pi.start_byte = "0";
@@ -367,6 +371,7 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	pi.timestamp = time;
 	tf.peerlist.push_back(pi);
 
+	// cout << "2" << endl;
 	return tf;
 }
 
