@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -217,8 +218,9 @@ void main_snd(int sock_id) {
 
 	for(int i = 0; i < 4; i++) {
 		calculateChunk(i);
-		cout << CURRENT_CHUNK_BEGIN << endl;
-		cout << CURRENT_CHUNK_END << endl;
+		cout << "I am client_" << CLIENT_ID << ", and I am advertising the following chunk of the file: ";
+		cout << ceil((CURRENT_CHUNK_BEGIN / float(TOTAL_FILE_SIZE))*100) << "% to "; 
+		cout << ceil((CURRENT_CHUNK_END / float(TOTAL_FILE_SIZE))*100)  << "%" << endl;
 		sock_id = setupConnections();
 		processUpdateTrackerCommand(sock_id);
 		sleep(10);
