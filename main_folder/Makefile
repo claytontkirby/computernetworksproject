@@ -1,11 +1,11 @@
 all: server.out client.out
 
 server.out:
-	g++ src/Tracker\ Server\ Skeleton.c -o test_server/server.out
+	g++ src/Tracker\ Server\ Skeleton.c -o server.out
 
 client.out:
-	g++ src/Peer\ Program\ Skeleton.c -o test_clients/client.out
+	g++ src/Peer\ Program\ Skeleton.c -o client.out
 
 clean:
-	rm -rf test_server/server.out
-	rm -rf test_clients/client.out
+	rm -rf server.out
+	rm -rf client.out
