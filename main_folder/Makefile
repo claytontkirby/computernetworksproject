@@ -1,9 +1,9 @@
-all: server.out client.out
+all: server client
 
-server.out:
+server:
 	g++ src/Tracker\ Server\ Skeleton.c -o server.out -w -pthread
 
-client.out:
+client:
 	g++ src/Peer\ Program\ Skeleton.c -o client.out -w -pthread
 
 clean:
