@@ -1,10 +1,10 @@
 all: server.out client.out
 
 server.out:
-	g++ src/Tracker\ Server\ Skeleton.c -o server.out -w
+	g++ src/Tracker\ Server\ Skeleton.c -o server.out -w -pthread
 
 client.out:
-	g++ src/Peer\ Program\ Skeleton.c -o client.out -w
+	g++ src/Peer\ Program\ Skeleton.c -o client.out -w -pthread
 
 clean:
 	rm -rf server.out

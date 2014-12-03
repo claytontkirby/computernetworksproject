@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,12 +57,12 @@ struct Config {
 };
 
 struct ThreadParams {
-	char recvBuf[1024];
 	string name;
 	string start_byte;
 	string end_byte;
+	string client_id;
 	int sockid;
-	int threadid;
+	int threadid;	
 };
 
 Config configFile;
@@ -95,6 +96,8 @@ void calculateChunk(int iteration);
 void writeToFile(string filename);
 
 void *run(void *);
+
+int pthread_yield(void);
 
 int main(int argc, char *argv[]){	
 	int sockid;
@@ -172,16 +175,18 @@ void main_rcv(int sock_id) {
 	}
 
 	while(j < 5) {
+		cout << "requesting" << endl;
 		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
+		cout << "tracker file received" << endl;
 		TrackerFile tf = parseTrackerFile(tfile);
-		cout << prev_byte << " " << tf.peerlist[0].start_byte << endl;
+		cout << prev_byte << " " << tf.peerlist[0].start_byte << endl;		
 		if(prev_byte != atoi(tf.peerlist[0].start_byte.c_str())) {
 			prev_byte = atoi(tf.peerlist[0].start_byte.c_str());
 			for(int i = 0; i < 5; i++) {
 				p[i].name = tf.filename;
 				p[i].start_byte = tf.peerlist[i].start_byte;
 				p[i].end_byte = tf.peerlist[i].end_byte;
-				p[i].sockid = sock_id;
+				p[i].sockid = setupConnections();
 				p[i].threadid = i+1;
 			}
 			pthread_create(&t1, NULL, run, &p[0]);
@@ -195,9 +200,8 @@ void main_rcv(int sock_id) {
 			pthread_join(t3, NULL) == 0 &&
 			pthread_join(t4, NULL) == 0 &&
 			pthread_join(t5, NULL) == 0) {
-				cout<<"All threads complete."<<endl;
-			}
-			cout << "I'm not blocking" << endl;
+				cout << "All threads complete." << endl;
+			}			
 			j++;
 		}
 	}
@@ -224,6 +228,8 @@ void main_snd(int sock_id) {
 void *run(void *param) {
 	struct ThreadParams *reformedParam = (struct ThreadParams *) param;
 	processGetCommand(reformedParam->sockid, reformedParam->name, reformedParam->start_byte, reformedParam->end_byte, reformedParam->threadid);
+	// pthread_yield();
+	pthread_exit(0);
 }
 
 void getWorkingDirectory() {
@@ -479,7 +485,7 @@ void processGetCommand(int sockid, string filename, string start_byte, string en
 	// string tfile = requestTrackerFile(sockid, file);
 	// TrackerFile tf = parseTrackerFile(tfile);
 
-	sockid = setupConnections();
+	// sockid = setupConnections();
 	downloadFile(filename, start_byte, end_byte, sockid, threadid);
 	close(sockid);
 }
@@ -505,14 +511,17 @@ string requestTrackerFile(int sockid, string file) {
 		exit(1);
 	}	
 
-	if((write(sockid,list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
+	cout << list_req << endl;
+	if((write(sockid,list_req.c_str(), list_req.size())) < 0){
 		printf("Send_request  failure\n"); exit(0);
 	}
+	cout << "wrote request" << endl;
 
 	bzero(recvBuf, MAX_RECV_LENGTH);
 	bzero(messageBody, MAX_RECV_LENGTH);
 	int j = 0;
 	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
+		// if(fr_block_size!=-1) cout << fr_block_size << endl;
 		for(int i = 0; i < strlen(recvBuf); i++) {			
 			if(recvBuf[i] == '<') {
 				isBody = false;
@@ -524,10 +533,12 @@ string requestTrackerFile(int sockid, string file) {
 			if(recvBuf[i] == '\n') {
 				isBody = true;
 			}
+			// cout << "for loop" << endl;
 		}
+		// cout << "while loop" << endl;
 		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
-
+	cout << "done looping" << endl;
 	write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
 	fclose(fr);
 	close(sockid);
@@ -565,7 +576,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 	// char recvBuf[MAX_RECV_LENGTH];
 	int fd_block_size;
 	// int write_size;
-	string download_req = "download " + filename + " " + start_byte + " " + end_byte;
+	stringstream ss;
+	ss << threadid;
+	string download_req = "download " + filename + " " + start_byte + " " + end_byte + " " + ss.str();
 
 	// strcpy(fpath, sharedFilePath.c_str());
 	// strcat(fpath, filename.c_str());	

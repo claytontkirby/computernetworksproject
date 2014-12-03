@@ -22,7 +22,7 @@ using namespace std;
 
 string trackerFilePath;
 string sharedFilePath;
-int MAX_SEND_LENGTH = 1024;
+int MAX_SEND_LENGTH = 1786;
 int IP = 0;
 int PORT = 0;
 int numThreads = 0;
@@ -50,6 +50,7 @@ struct DownloadReq {
 	string filename;
 	int start_byte;
 	int end_byte;
+	string client_id;
 };
 
 vector<TrackerFile> trackerFiles;
@@ -110,8 +111,6 @@ int main(int argc, char* argv[]){
 
 	getWorkingDirectory();
 
-	// loadTrackerFiles();
-
 	sockid = setupSocketConnections();	
 
 	outputNetworkInfo(sockid);
@@ -123,7 +122,9 @@ int main(int argc, char* argv[]){
 		if (listen(sockid, numThreads) < 0){ //(parent) process listens at sockid and check error
 			printf(" Tracker SERVER CANNOT LISTEN\n"); exit(0);
 		}
+
 		listenForConnections(sockid);
+		// cout << "done listening" << endl;
 	}         
 }
     
@@ -136,6 +137,8 @@ void getWorkingDirectory() {
 	}
 
 	trackerFilePath = cwd;
+	sharedFilePath = cwd;
+	sharedFilePath += "/test_clients/client_";
 	trackerFilePath += "/test_server/";
 }
 
@@ -162,7 +165,6 @@ void loadTrackerFiles() {
 				getline(in, tf.filesize);
 				getline(in, tf.description);
 				getline(in, tf.md5);
-				int i = 0;
 				while(!in.eof()) {
 					getline(in, pi.ip, ':');
 					getline(in, pi.port, ':');
@@ -262,16 +264,19 @@ void listenForConnections(int sockid) {
 		if ((pid=fork())==0) {//New child process will serve the requester client. separate child will serve separate client
 		   numThreads--;
 		   close(sockid);   //child does not need listener
-		   peer_handler(sockchild);//child is serving the client.	   
+		   peer_handler(sockchild);//child is serving the client.	
+		   cout << "peer handled" << endl;   
 		   close(sockchild);// printf("\n 1. closed");	   
 		   numThreads++;
 		   // cout << "about to kill " << trackerFiles.size() << endl;
 		   // trackerFiles.clear();
 		   // cout << "size " << trackerFiles.size() << endl;
+		   cout << "exiting" << endl;
 		   exit(0);         // kill the process. child process all done with work
 	    }
 	}
 	close(sockchild);  // parent all done with client, only child will communicate with that client from now
+	// close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
 
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
@@ -295,9 +300,11 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		handle_createtracker_req(sock_child, read_msg);		
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
-		handle_updatetracker_req(sock_child, read_msg);		
+		handle_updatetracker_req(sock_child, read_msg);	
+		cout << "update handled" << endl;	
 	} else if(strstr(read_msg, "download") != NULL) {
 		handle_download(sock_child, read_msg);
+		cout << "download handled" << endl;
 	}
 	
 	trackerFiles.clear();
@@ -447,7 +454,7 @@ void handle_get_req(int sock_child, char* read_msg) {
 	strcat(filePathBuf, ".track");
 	FILE *fs = fopen(filePathBuf, "rb");
 	if(fs == 0) {
-		cout << "error opening file" << endl;
+		cout << "error opening file " << errno << endl;
 	}
 
 	strcpy(sendBuf, "<REP GET BEGIN>\n");
@@ -489,9 +496,12 @@ void handle_download(int sock_child, char* read_msg) {
 	int fileBlockSize;
 	int bytes_sent;
 
+	sharedFilePath += dr.client_id;
+	sharedFilePath += "/";
 	strcpy(filePathBuf, sharedFilePath.c_str());
 	strcat(filePathBuf, dr.filename.c_str());
 	FILE *fs = fopen(filePathBuf, "r+b");
+	cout << filePathBuf << endl;
 	if(fs == NULL) {
 		cout << "error opening file" << endl; exit(1);
 	}
@@ -500,15 +510,17 @@ void handle_download(int sock_child, char* read_msg) {
 	fseek(fs, dr.start_byte, SEEK_SET);
 	cout << "Sending " << dr.end_byte - dr.start_byte << " bytes..." << endl;
 	// rewind(fs);
-	// fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs);
-	while((fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs))) {
+	fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs);
+	// while((fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs))) {
 		if((bytes_sent = send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
 			cout << "Error sending tracker file" << endl;
 		}
+		cout << bytes_sent << endl;
 
 		bzero(sendBuf, MAX_SEND_LENGTH);
-	}
+	// }
 	fclose(fs);
+	cout << "closing the file" << endl;
 }
 
 DownloadReq parseDownloadRequest(char* read_msg) {
@@ -519,6 +531,7 @@ DownloadReq parseDownloadRequest(char* read_msg) {
 	dr.filename = strtok(NULL, " ");
 	dr.start_byte = atoi(strtok(NULL, " "));
 	dr.end_byte = atoi(strtok(NULL, " "));
+	dr.client_id = strtok(NULL, " ");
 	return dr;
 }
 
