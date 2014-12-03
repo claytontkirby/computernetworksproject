@@ -1,11 +1,11 @@
 #!/bin/bash
 
-x-terminal-emulator -e ./client.out snd 1 & wait
+./client.out snd 1 &
 
-x-terminal-emulator -e ./client.out snd 2 & wait
+./client.out snd 2 &
 
-x-terminal-emulator -e ./client.out snd 3 & wait
+./client.out snd 3 &
 
-x-terminal-emulator -e ./client.out snd 4 & wait
+./client.out snd 4 &
 
-x-terminal-emulator -e ./client.out snd 5 & wait
+./client.out snd 5 & wait

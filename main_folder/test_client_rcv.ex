@@ -1,11 +1,11 @@
 #!/bin/bash
 
-x-terminal-emulator -e ./client.out rcv 6 & wait
+./client.out rcv 6 &
 
-x-terminal-emulator -e ./client.out rcv 7 & wait
+./client.out rcv 7 &
 
-x-terminal-emulator -e ./client.out rcv 8 & wait
+./client.out rcv 8 &
 
-x-terminal-emulator -e ./client.out rcv 9 & wait
+./client.out rcv 9 &
 
-x-terminal-emulator -e ./client.out rcv 10 & wait
+./client.out rcv 10 & wait
