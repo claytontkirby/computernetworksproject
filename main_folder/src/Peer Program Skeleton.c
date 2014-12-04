@@ -680,3 +680,5 @@ void writeToFile(string filename) {
 	rewind(fd);
 	fclose(fd);
 }
+
+///@file
