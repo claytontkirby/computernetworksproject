@@ -511,11 +511,17 @@ void handle_download(int sock_child, char* read_msg) {
 
 	bzero(sendBuf, MAX_SEND_LENGTH);
 	fseek(fs, dr.start_byte, SEEK_SET);
-	cout << "Sending " << dr.end_byte - dr.start_byte << " bytes..." << endl;
+	cout << "Sending " << (dr.end_byte - dr.start_byte) + 1 << " bytes..." << endl;
 	// rewind(fs);
-	fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs);
+	fileBlockSize = fread(sendBuf, sizeof(char), (dr.end_byte - dr.start_byte) + 1, fs);
+	if(fileBlockSize > 1786)
+		cout << "start " << dr.start_byte << " end " << dr.end_byte << endl;	
 	// while((fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs))) {
+	// if(dr.client_id == "5")
+		// cout << "read bytes " << fileBlockSize << endl;
 	while(bytes_sent < fileBlockSize) {
+		// if(dr.client_id == "5")
+			// cout << "bytes sent " << bytes_sent << endl;
 		if((bytes_sent += send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
 			cout << "Error sending requested file" << endl;
 		}

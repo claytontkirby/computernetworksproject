@@ -21,4 +21,4 @@ rm -f test_clients/client_10/*.jpg
 
 ./client.out rcv 9 &
 
-./client.out rcv 10
+./client.out rcv 10 & wait
