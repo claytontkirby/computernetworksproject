@@ -7,6 +7,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -113,18 +114,20 @@ int main(int argc, char* argv[]){
 
 	sockid = setupSocketConnections();	
 
-	outputNetworkInfo(sockid);
+	// outputNetworkInfo(sockid);
 
 	while(true){
 		cout << endl;
 		cout << "Tracker server listening for incoming connections..." << endl;
 		
+		// sockid = setupSocketConnections();
+
 		if (listen(sockid, numThreads) < 0){ //(parent) process listens at sockid and check error
-			printf(" Tracker SERVER CANNOT LISTEN\n"); exit(0);
+			printf(" Tracker SERVER CANNOT LISTEN %d\n", errno); exit(0);
 		}
 
 		listenForConnections(sockid);
-		// cout << "done listening" << endl;
+		// cout << "listened" << endl;
 	}         
 }
     
@@ -264,18 +267,17 @@ void listenForConnections(int sockid) {
 		if ((pid=fork())==0) {//New child process will serve the requester client. separate child will serve separate client
 		   numThreads--;
 		   close(sockid);   //child does not need listener
-		   peer_handler(sockchild);//child is serving the client.	
-		   cout << "peer handled" << endl;   
+		   peer_handler(sockchild);//child is serving the client.
+		   // cout << "peer handled" << endl;	   
 		   close(sockchild);// printf("\n 1. closed");	   
 		   numThreads++;
-		   // cout << "about to kill " << trackerFiles.size() << endl;
-		   // trackerFiles.clear();
-		   // cout << "size " << trackerFiles.size() << endl;
-		   cout << "exiting" << endl;
-		   exit(0);         // kill the process. child process all done with work
+		   // cout << "about to exit" << endl;
+		   // kill(getpid(), SIGKILL);
+		   _exit(0);         // kill the process. child process all done with work
 	    }
 	}
 	close(sockchild);  // parent all done with client, only child will communicate with that client from now
+	// cout << "leaving" << endl;
 	// close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
 
@@ -284,7 +286,9 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	int length;
 	char read_msg[201];
 	bzero(read_msg, 201);
+	// cout << "about to read" << endl;
 	length=read(sock_child, &read_msg, 200);
+	// cout << read_msg << endl;
 	read_msg[length+1]='\0';
 	loadTrackerFiles();
 
@@ -301,7 +305,6 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	}
 	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
 		handle_updatetracker_req(sock_child, read_msg);	
-		cout << "update handled" << endl;	
 	} else if(strstr(read_msg, "download") != NULL) {
 		handle_download(sock_child, read_msg);
 		cout << "download handled" << endl;
@@ -440,7 +443,7 @@ void handle_get_req(int sock_child, char* read_msg) {
 	string filename = parseGetRequest(read_msg);
 	TrackerFile tf;
 	char sendBuf[MAX_SEND_LENGTH];
-	char filePathBuf[100];
+	char filePathBuf[300];
 	int fileBlockSize;
 
 	for(int i = 0; i < trackerFiles.size(); i++) {
@@ -492,7 +495,7 @@ void handle_download(int sock_child, char* read_msg) {
 	// string filename = strtok(NULL, " ");
 	DownloadReq dr = parseDownloadRequest(read_msg);
 	char sendBuf[MAX_SEND_LENGTH];
-	char filePathBuf[100];
+	char filePathBuf[300];
 	int fileBlockSize;
 	int bytes_sent;
 
@@ -513,14 +516,15 @@ void handle_download(int sock_child, char* read_msg) {
 	fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs);
 	// while((fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs))) {
 		if((bytes_sent = send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
-			cout << "Error sending tracker file" << endl;
+			cout << "Error sending requested file" << endl;
 		}
-		cout << bytes_sent << endl;
+		// cout << bytes_sent << endl;
 
 		bzero(sendBuf, MAX_SEND_LENGTH);
 	// }
 	fclose(fs);
-	cout << "closing the file" << endl;
+	// close(sock_child);
+	// cout << "closing the file" << endl;
 }
 
 DownloadReq parseDownloadRequest(char* read_msg) {

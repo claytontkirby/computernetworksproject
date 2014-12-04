@@ -169,11 +169,16 @@ void main_rcv(int sock_id) {
 	ThreadParams p[5];
 	string msg = "";
 	while(msg.find("picture-wallpaper.jpg") == string::npos) {
-		cout << "looping" << endl;	
 		msg = processListCommand(sock_id);		
 		sock_id = setupConnections();
 		sleep(5);
-	}
+	}	
+
+	bzero(THREAD1_RECVBUF, 10000);
+	bzero(THREAD2_RECVBUF, 10000);
+	bzero(THREAD3_RECVBUF, 10000);
+	bzero(THREAD4_RECVBUF, 10000);
+	bzero(THREAD5_RECVBUF, 10000);
 
 	while(j < 5) {
 		cout << "requesting" << endl;
@@ -218,9 +223,12 @@ void main_snd(int sock_id) {
 
 	for(int i = 0; i < 4; i++) {
 		calculateChunk(i);
+<<<<<<< Updated upstream
 		cout << "I am client_" << CLIENT_ID << ", and I am advertising the following chunk of the file: ";
 		cout << ceil((CURRENT_CHUNK_BEGIN / float(TOTAL_FILE_SIZE))*100) << "% to "; 
 		cout << ceil((CURRENT_CHUNK_END / float(TOTAL_FILE_SIZE))*100)  << "%" << endl;
+=======
+>>>>>>> Stashed changes
 		sock_id = setupConnections();
 		processUpdateTrackerCommand(sock_id);
 		sleep(10);
@@ -230,7 +238,8 @@ void main_snd(int sock_id) {
 void *run(void *param) {
 	struct ThreadParams *reformedParam = (struct ThreadParams *) param;
 	processGetCommand(reformedParam->sockid, reformedParam->name, reformedParam->start_byte, reformedParam->end_byte, reformedParam->threadid);
-	// pthread_yield();
+	// pthread_yield();	
+	close(reformedParam->sockid);
 	pthread_exit(0);
 }
 
@@ -248,6 +257,7 @@ void getWorkingDirectory() {
 	sharedFilePath += "/test_clients/client_";
 	ss << CLIENT_ID;
 	sharedFilePath += ss.str();
+	// trackerFilePath 
 	// trackerFilePath += "/trackers";
 	// if(stat(sharedFilePath.c_str(), &st)) {
 		// cout << "mkdir" << endl;
@@ -489,12 +499,12 @@ void processGetCommand(int sockid, string filename, string start_byte, string en
 
 	// sockid = setupConnections();
 	downloadFile(filename, start_byte, end_byte, sockid, threadid);
-	close(sockid);
+	// close(sockid);
 }
 
 string requestTrackerFile(int sockid, string file) {
 	string list_req = "get ";
-	char fpath[100];
+	char fpath[300];
 	char recvBuf[MAX_RECV_LENGTH];
 	char messageBody[MAX_RECV_LENGTH];
 	int fr_block_size;
@@ -503,10 +513,11 @@ string requestTrackerFile(int sockid, string file) {
 	TrackerFile tf;
 
 	list_req += file;
-	strcpy(fpath, trackerFilePath.c_str());
+	strcpy(fpath, sharedFilePath.c_str());
 	strcat(fpath, file.c_str());
 	strcat(fpath, ".track");
 
+	cout << fpath << endl;
 	FILE *fr = fopen(fpath, "wb");
 	if (fr == NULL) {
 		cout << "File cannot be opened" << endl;
@@ -542,8 +553,11 @@ string requestTrackerFile(int sockid, string file) {
 	}
 	cout << "done looping" << endl;
 	write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
+	cout << "written" << endl;
 	fclose(fr);
-	close(sockid);
+	cout << "closed" << endl;
+	// close(sockid);
+	cout << "closed" << endl;
 	return fpath;
 }
 
@@ -624,10 +638,11 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 	// cout << "Received " << ftell(fd) << " bytes..." << endl;
 	// rewind(fd);
 	// fclose(fd);
+	// writeToFile("picture-wallpaper.jpg");
 }
 
 void writeToFile(string filename) {
-	char fpath[100];
+	char fpath[300];
 	strcpy(fpath, sharedFilePath.c_str());
 	strcat(fpath, filename.c_str());	
 
