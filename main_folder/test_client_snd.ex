@@ -8,4 +8,4 @@
 
 ./client.out snd 4 &
 
-./client.out snd 5 & wait
+./client.out snd 5

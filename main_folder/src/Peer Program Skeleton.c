@@ -193,13 +193,15 @@ void main_rcv(int sock_id) {
 		sock_id = setupConnections();
 		// cout << "tracker file received" << endl;
 		TrackerFile tf = parseTrackerFile(tfile);
-		cout << prev_byte << " " << tf.peerlist[0].end_byte << endl;		
-		if(prev_byte != atoi(tf.peerlist[0].end_byte.c_str())) {
-			prev_byte = atoi(tf.peerlist[0].end_byte.c_str());
+		// cout << prev_byte << " " << tf.peerlist[4].end_byte << endl;		
+		if(prev_byte != atoi(tf.peerlist[4].end_byte.c_str())) {
+			prev_byte = atoi(tf.peerlist[4].end_byte.c_str());
 			for(int i = 0; i < 5; i++) {
 				p[i].name = tf.filename;
 				p[i].start_byte = tf.peerlist[i].start_byte;
+				cout << "thread " << i+1 << " peer " << i << " start byte " << p[i].start_byte << endl;				
 				p[i].end_byte = tf.peerlist[i].end_byte;
+				cout << "thread " << i+1 << " peer " << i << " end byte " << p[i].end_byte << endl;				
 				p[i].sockid = setupConnections();
 				p[i].threadid = i+1;
 			}
@@ -213,9 +215,8 @@ void main_rcv(int sock_id) {
 			pthread_join(t2, NULL) == 0 &&
 			pthread_join(t3, NULL) == 0 &&
 			pthread_join(t4, NULL) == 0 &&
-			pthread_join(t5, NULL) == 0) {
-				cout << "I am client_" << CLIENT_ID << ", and I received the file correctly!" << endl;
-				cout << "All threads complete." << endl;
+			pthread_join(t5, NULL) == 0) {				
+				// cout << "All threads complete." << endl;
 			}			
 			j++;
 		}
@@ -399,11 +400,11 @@ void calculateChunk(int iteration) {
 	int client_chunk_begin;
 	int client_chunk_end;
 
-	R1 = TOTAL_FILE_SIZE % 5;
+	// R1 = TOTAL_FILE_SIZE % 5;
 	CHUNK_SIZE = TOTAL_FILE_SIZE / 5;
 	// cout << TOTAL_FILE_SIZE << endl;
 	// cout << CHUNK_SIZE << endl;
-	R2 = CHUNK_SIZE % 4;
+	// R2 = CHUNK_SIZE % 4;
 	QUARTER_CHUNK_SIZE = CHUNK_SIZE / 4;
 
 	client_chunk_begin = (QUARTER_CHUNK_SIZE * 4) * (CLIENT_ID - 1);
@@ -675,6 +676,7 @@ void writeToFile(string filename) {
 
 	fseek(fd, 0, SEEK_END);
 	cout << "Received " << ftell(fd) << " bytes..." << endl;
+	cout << "I am client_" << CLIENT_ID << ", and I received the file correctly!" << endl;
 	rewind(fd);
 	fclose(fd);
 }

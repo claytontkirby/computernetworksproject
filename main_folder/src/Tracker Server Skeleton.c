@@ -521,7 +521,7 @@ void handle_download(int sock_child, char* read_msg) {
 		}
 		// cout << bytes_sent << endl;
 	}
-		// bzero(sendBuf, MAX_SEND_LENGTH);
+		bzero(sendBuf, MAX_SEND_LENGTH);
 
 	// }
 	fclose(fs);
