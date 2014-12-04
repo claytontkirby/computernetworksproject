@@ -206,6 +206,7 @@ void main_rcv(int sock_id) {
 			pthread_join(t3, NULL) == 0 &&
 			pthread_join(t4, NULL) == 0 &&
 			pthread_join(t5, NULL) == 0) {
+				cout << "I am client_" << CLIENT_ID << ", and I received the file correctly!" << endl;
 				cout << "All threads complete." << endl;
 			}			
 			j++;
