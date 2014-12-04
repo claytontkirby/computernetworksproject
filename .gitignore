@@ -2,3 +2,4 @@ Client/peer
 Server/tracker
 */trackers/*
 */shared/*
+*.out
