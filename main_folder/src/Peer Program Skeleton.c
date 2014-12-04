@@ -19,13 +19,15 @@ using namespace std;
 
 string sharedFilePath;
 string trackerFilePath;
-int MAX_RECV_LENGTH = 1024;
+int MAX_RECV_LENGTH = 2000;
 int CLIENT_ID = 0;
 int CHUNK_SIZE = 0;
 int CURRENT_CHUNK_BEGIN = 0;
 int CURRENT_CHUNK_END = 0;
 int QUARTER_CHUNK_SIZE = 0;
 int TOTAL_FILE_SIZE = 0;
+int R1 = 0;
+int R2 = 0; 
 string IPADDRESS = "127.0.0.1";
 string PORT = "3456";
 char THREAD1_RECVBUF[10000];
@@ -33,6 +35,11 @@ char THREAD2_RECVBUF[10000];
 char THREAD3_RECVBUF[10000];
 char THREAD4_RECVBUF[10000];
 char THREAD5_RECVBUF[10000];
+int THREAD1_RECVSIZE = 0;
+int THREAD2_RECVSIZE = 0;
+int THREAD3_RECVSIZE = 0;
+int THREAD4_RECVSIZE = 0;
+int THREAD5_RECVSIZE = 0;
 
 struct PeerInfo {
 	string ip;
@@ -165,7 +172,7 @@ int main(int argc, char *argv[]){
 void main_rcv(int sock_id) {
 	pthread_t t1, t2, t3, t4, t5;
 	int prev_byte = 999999;
-	int j = 0;
+	int j = 1;
 	ThreadParams p[5];
 	string msg = "";
 	while(msg.find("picture-wallpaper.jpg") == string::npos) {
@@ -181,13 +188,14 @@ void main_rcv(int sock_id) {
 	bzero(THREAD5_RECVBUF, 10000);
 
 	while(j < 5) {
-		cout << "requesting" << endl;
+		// cout << "requesting" << endl;
 		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
-		cout << "tracker file received" << endl;
+		sock_id = setupConnections();
+		// cout << "tracker file received" << endl;
 		TrackerFile tf = parseTrackerFile(tfile);
-		cout << prev_byte << " " << tf.peerlist[0].start_byte << endl;		
-		if(prev_byte != atoi(tf.peerlist[0].start_byte.c_str())) {
-			prev_byte = atoi(tf.peerlist[0].start_byte.c_str());
+		cout << prev_byte << " " << tf.peerlist[0].end_byte << endl;		
+		if(prev_byte != atoi(tf.peerlist[0].end_byte.c_str())) {
+			prev_byte = atoi(tf.peerlist[0].end_byte.c_str());
 			for(int i = 0; i < 5; i++) {
 				p[i].name = tf.filename;
 				p[i].start_byte = tf.peerlist[i].start_byte;
@@ -211,6 +219,7 @@ void main_rcv(int sock_id) {
 			}			
 			j++;
 		}
+		sleep(1);
 	}
 
 	writeToFile("picture-wallpaper.jpg");
@@ -377,7 +386,7 @@ void processCreateTrackerCommand(int sockid) {
 
 			msg[100] = '\0';
 			list_req="";
-			cout << "Receiving create tracker response: " << msg << endl;
+			// cout << "Receiving create tracker response: " << msg << endl;
 			close(sockid);				
 			sockid = setupConnections();	
 		}
@@ -390,18 +399,26 @@ void calculateChunk(int iteration) {
 	int client_chunk_begin;
 	int client_chunk_end;
 
+	R1 = TOTAL_FILE_SIZE % 5;
 	CHUNK_SIZE = TOTAL_FILE_SIZE / 5;
+	// cout << TOTAL_FILE_SIZE << endl;
+	// cout << CHUNK_SIZE << endl;
+	R2 = CHUNK_SIZE % 4;
 	QUARTER_CHUNK_SIZE = CHUNK_SIZE / 4;
 
-	client_chunk_begin = (CHUNK_SIZE * CLIENT_ID) - CHUNK_SIZE;
+	client_chunk_begin = (QUARTER_CHUNK_SIZE * 4) * (CLIENT_ID - 1);
 	if(client_chunk_begin != 0)
 		client_chunk_begin++;
-	client_chunk_end = CHUNK_SIZE * CLIENT_ID;
+	client_chunk_end = (QUARTER_CHUNK_SIZE * 4) * CLIENT_ID;
+	// if(CLIENT_ID == 5) 
+	// 	client_chunk_end += 3;
 
 	CURRENT_CHUNK_BEGIN = client_chunk_begin + (QUARTER_CHUNK_SIZE * iteration);
 	if(CURRENT_CHUNK_BEGIN != 0)
 		CURRENT_CHUNK_BEGIN++;
 	CURRENT_CHUNK_END = client_chunk_begin + (QUARTER_CHUNK_SIZE * (iteration + 1));
+	if(iteration == 3 && CLIENT_ID == 5)
+		CURRENT_CHUNK_END = TOTAL_FILE_SIZE;
 }
 
 void processUpdateTrackerCommand(int sockid) {
@@ -526,7 +543,7 @@ string requestTrackerFile(int sockid, string file) {
 	if((write(sockid,list_req.c_str(), list_req.size())) < 0){
 		printf("Send_request  failure\n"); exit(0);
 	}
-	cout << "wrote request" << endl;
+	// cout << "wrote request" << endl;
 
 	bzero(recvBuf, MAX_RECV_LENGTH);
 	bzero(messageBody, MAX_RECV_LENGTH);
@@ -549,13 +566,13 @@ string requestTrackerFile(int sockid, string file) {
 		// cout << "while loop" << endl;
 		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
-	cout << "done looping" << endl;
+	// cout << "done looping" << endl;
 	write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
-	cout << "written" << endl;
+	// cout << "written" << endl;
 	fclose(fr);
-	cout << "closed" << endl;
-	// close(sockid);
-	cout << "closed" << endl;
+	// cout << "closed" << endl;
+	close(sockid);
+	// cout << "closed" << endl;
 	return fpath;
 }
 
@@ -588,7 +605,7 @@ TrackerFile parseTrackerFile(string tfile) {
 void downloadFile(string filename, string start_byte, string end_byte, int sockid, int threadid) {
 	// char fpath[100];
 	// char recvBuf[MAX_RECV_LENGTH];
-	int fd_block_size;
+	int fd_block_size = 0;
 	// int write_size;
 	stringstream ss;
 	ss << threadid;
@@ -611,19 +628,19 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 
 	switch(threadid) {
 		case 1:
-			while((fd_block_size = recv(sockid, THREAD1_RECVBUF, MAX_RECV_LENGTH, 0))) {}
+			while((fd_block_size = recv(sockid, THREAD1_RECVBUF, MAX_RECV_LENGTH, 0))) { THREAD1_RECVSIZE += fd_block_size; }
 			break;
 		case 2:
-			while((fd_block_size = recv(sockid, THREAD2_RECVBUF, MAX_RECV_LENGTH, 0))) {}
+			while((fd_block_size = recv(sockid, THREAD2_RECVBUF, MAX_RECV_LENGTH, 0))) { THREAD2_RECVSIZE += fd_block_size; }
 			break;
 		case 3:
-			while((fd_block_size = recv(sockid, THREAD3_RECVBUF, MAX_RECV_LENGTH, 0))) {}
+			while((fd_block_size = recv(sockid, THREAD3_RECVBUF, MAX_RECV_LENGTH, 0))) { THREAD3_RECVSIZE += fd_block_size; }
 			break;
 		case 4:
-			while((fd_block_size = recv(sockid, THREAD4_RECVBUF, MAX_RECV_LENGTH, 0))) {}
+			while((fd_block_size = recv(sockid, THREAD4_RECVBUF, MAX_RECV_LENGTH, 0))) { THREAD4_RECVSIZE += fd_block_size; }
 			break;
 		case 5:
-			while((fd_block_size = recv(sockid, THREAD5_RECVBUF, MAX_RECV_LENGTH, 0))) {}
+			while((fd_block_size = recv(sockid, THREAD5_RECVBUF, MAX_RECV_LENGTH, 0))) { THREAD5_RECVSIZE += fd_block_size; }
 			break;
 	}
 
@@ -650,11 +667,11 @@ void writeToFile(string filename) {
 		exit(1);
 	}
 
-	fwrite(THREAD1_RECVBUF, sizeof(char), sizeof(THREAD1_RECVBUF),fd);
-	fwrite(THREAD2_RECVBUF, sizeof(char), sizeof(THREAD2_RECVBUF),fd);
-	fwrite(THREAD3_RECVBUF, sizeof(char), sizeof(THREAD3_RECVBUF),fd);
-	fwrite(THREAD4_RECVBUF, sizeof(char), sizeof(THREAD4_RECVBUF),fd);
-	fwrite(THREAD5_RECVBUF, sizeof(char), sizeof(THREAD5_RECVBUF),fd);
+	fwrite(THREAD1_RECVBUF, sizeof(char), THREAD1_RECVSIZE,fd);
+	fwrite(THREAD2_RECVBUF, sizeof(char), THREAD2_RECVSIZE,fd);
+	fwrite(THREAD3_RECVBUF, sizeof(char), THREAD3_RECVSIZE,fd);
+	fwrite(THREAD4_RECVBUF, sizeof(char), THREAD4_RECVSIZE,fd);
+	fwrite(THREAD5_RECVBUF, sizeof(char), THREAD5_RECVSIZE,fd);
 
 	fseek(fd, 0, SEEK_END);
 	cout << "Received " << ftell(fd) << " bytes..." << endl;

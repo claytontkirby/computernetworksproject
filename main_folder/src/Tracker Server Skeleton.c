@@ -23,7 +23,7 @@ using namespace std;
 
 string trackerFilePath;
 string sharedFilePath;
-int MAX_SEND_LENGTH = 1786;
+int MAX_SEND_LENGTH = 2000;
 int IP = 0;
 int PORT = 0;
 int numThreads = 0;
@@ -284,10 +284,10 @@ void listenForConnections(int sockid) {
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
 	int length;
-	char read_msg[201];
-	bzero(read_msg, 201);
+	char read_msg[301];
+	bzero(read_msg, 301);
 	// cout << "about to read" << endl;
-	length=read(sock_child, &read_msg, 200);
+	length=read(sock_child, &read_msg, 300);
 	// cout << read_msg << endl;
 	read_msg[length+1]='\0';
 	loadTrackerFiles();
@@ -497,7 +497,7 @@ void handle_download(int sock_child, char* read_msg) {
 	char sendBuf[MAX_SEND_LENGTH];
 	char filePathBuf[300];
 	int fileBlockSize;
-	int bytes_sent;
+	int bytes_sent = 0;
 
 	sharedFilePath += dr.client_id;
 	sharedFilePath += "/";
@@ -515,12 +515,14 @@ void handle_download(int sock_child, char* read_msg) {
 	// rewind(fs);
 	fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs);
 	// while((fileBlockSize = fread(sendBuf, sizeof(char), dr.end_byte - dr.start_byte, fs))) {
-		if((bytes_sent = send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
+	while(bytes_sent < fileBlockSize) {
+		if((bytes_sent += send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
 			cout << "Error sending requested file" << endl;
 		}
 		// cout << bytes_sent << endl;
+	}
+		// bzero(sendBuf, MAX_SEND_LENGTH);
 
-		bzero(sendBuf, MAX_SEND_LENGTH);
 	// }
 	fclose(fs);
 	// close(sock_child);
