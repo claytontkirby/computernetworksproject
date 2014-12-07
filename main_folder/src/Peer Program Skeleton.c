@@ -41,6 +41,8 @@ int THREAD2_RECVSIZE = 0;
 int THREAD3_RECVSIZE = 0;
 int THREAD4_RECVSIZE = 0;
 int THREAD5_RECVSIZE = 0;
+pthread_mutex_t dwnld_lock;
+pthread_mutex_t connection_lock;
 
 struct PeerInfo {
 	string ip;
@@ -57,6 +59,7 @@ struct TrackerFile {
 	string description;
 	string md5;
 	vector<PeerInfo> peerlist;
+	bool isNULL;
 };
 
 struct Config {
@@ -78,8 +81,6 @@ Config configFile;
 
 void getWorkingDirectory();
 
-void loadConfig();
-
 int setupConnections();
 
 string requestTrackerFile(int sockid, string file);
@@ -96,9 +97,9 @@ string processListCommand(int sockid);
 
 void processGetCommand(int sockid, string filename, string start_byte, string end_byte, int threadid);
 
-void main_rcv(int sock_id);
+void main_rcv();
 
-void main_snd(int sock_id);
+void main_snd();
 
 void calculateChunk(int iteration);
 
@@ -111,76 +112,35 @@ int pthread_yield(void);
 bool sort_func(PeerInfo p1, PeerInfo p2) { return atoi(p1.client_id.c_str()) < atoi(p2.client_id.c_str()); }
 
 int main(int argc, char *argv[]){	
-	int sockid;
-	string command;
-
-	// loadConfig();
-    
-	system("clear");
-
-	sockid = setupConnections();
-
 	CLIENT_ID = atoi(argv[2]);
 	getWorkingDirectory();
 
 	if(strcmp(argv[1], "rcv") == 0)
-		main_rcv(sockid);
+		main_rcv();
 	else if(strcmp(argv[1], "snd") == 0)
-		main_snd(sockid);
-	else
-		printf("No such client type.\n"); exit(1);
-
-	// while(true) {
-	// 	sockid = setupConnections();
-	// 	cout << "Connected to server and ready for communication..." << endl;
-	// 	cout << endl;
-	// 	cout << "Choose an action:" << endl;
-	// 	cout << "1) Create Trackers" << endl;
-	// 	cout << "2) Update Trackers" << endl;
-	// 	cout << "3) List Tracker Files from Server" << endl;
-	// 	cout << "4) Get File" << endl;
-	// 	cout << "5) Exit" << endl;
-	// 	cin >> command;
-	// 	system("clear");
-
-	// 	if(command == "1"){
-	// 		cout << "Sending create tracker request..." << endl;
-	// 		processCreateTrackerCommand(sockid);
-	// 	} else if(command == "2") {
-	// 		cout << "Sending update tracker request..." << endl;
-	// 		processUpdateTrackerCommand(sockid);
-	// 	} else if(command == "3") {
-	// 		cout << "Sending list request..." << endl;
-	// 		processListCommand(sockid);
-	// 	} else if(command == "4") {
-	// 		system("clear");
-	// 		cout << "Name of file to download: ";
-	// 		cin >> command;
-	// 		processGetCommand(sockid, command);
-	// 		cout << "File download complete." << endl;
-	// 		sleep(1);
-	// 	} else if(command == "5") {
-	// 		close(sockid);
-	// 		printf("Connection Closed");
-	// 		exit(0);
-	// 	} else {
-	// 		printf("Unrecognized command");
-	// 	}
-	// 	cout << endl << endl;
-	// }
+		main_snd();
+	else {
+		printf("No such client type.\n"); 
+		exit(1);
+	}
     
     return 0;
 }
 
-void main_rcv(int sock_id) {
+void main_rcv() {
+	int sock_id;
 	pthread_t t1, t2, t3, t4, t5;
-	int prev_byte = 999999;
+	int prev_byte_1 = 999999;
+	int prev_byte_2 = 999999;
+	int prev_byte_3 = 999999;
+	int prev_byte_4 = 999999;
+	int prev_byte_5 = 999999;
 	int j = 1;
 	ThreadParams p[5];
 	string msg = "";
 	while(msg.find("picture-wallpaper.jpg") == string::npos) {
-		msg = processListCommand(sock_id);		
 		sock_id = setupConnections();
+		msg = processListCommand(sock_id);	
 		sleep(5);
 	}	
 
@@ -190,25 +150,51 @@ void main_rcv(int sock_id) {
 	bzero(THREAD4_RECVBUF, 10000);
 	bzero(THREAD5_RECVBUF, 10000);
 
-	while(j < 5) {
-		// cout << "requesting" << endl;
-		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
-		sock_id = setupConnections();
-		// cout << "tracker file received" << endl;
+	pthread_mutex_init(&dwnld_lock, NULL);
+	pthread_mutex_init(&connection_lock, NULL);
+
+	while(j < 5 || prev_byte_5 != 35738) {
+		// cout << "looping" << endl;		
+		sock_id = setupConnections();		
+ 		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
 		TrackerFile tf = parseTrackerFile(tfile);
-		// cout << prev_byte << " " << tf.peerlist[4].end_byte << endl;		
-		if(prev_byte != atoi(tf.peerlist[4].end_byte.c_str())) {
-			prev_byte = atoi(tf.peerlist[4].end_byte.c_str());
-			if(CLIENT_ID == 6)
-				cout << "CHUNKS:" << endl;
+		if(tf.isNULL == true) {
+			cout << "continuing" << endl;
+			usleep(500000);
+			continue;			
+		}
+		cout << "Prev byte 1: " << prev_byte_1 << " new byte: " << tf.peerlist[0].end_byte << endl; 
+		cout << "Prev byte 2: " << prev_byte_2 << " new byte: " << tf.peerlist[1].end_byte << endl; 
+		cout << "Prev byte 3: " << prev_byte_3 << " new byte: " << tf.peerlist[2].end_byte << endl; 
+		cout << "Prev byte 4: " << prev_byte_4 << " new byte: " << tf.peerlist[3].end_byte << endl; 
+		cout << "Prev byte 5: " << prev_byte_5 << " new byte: " << tf.peerlist[4].end_byte << endl;
+		// cout << tf.peerlist.size() << endl;
+		// cout << "new byte1: " << tf.peerlist[0]		
+		if(prev_byte_1 != atoi(tf.peerlist[0].end_byte.c_str()) &&
+			prev_byte_2 != atoi(tf.peerlist[1].end_byte.c_str()) &&
+			prev_byte_3 != atoi(tf.peerlist[2].end_byte.c_str()) &&
+			prev_byte_4 != atoi(tf.peerlist[3].end_byte.c_str()) &&
+			prev_byte_5 != atoi(tf.peerlist[4].end_byte.c_str())) {
+
+			prev_byte_1 = atoi(tf.peerlist[0].end_byte.c_str());
+			prev_byte_2 = atoi(tf.peerlist[1].end_byte.c_str());
+			prev_byte_3 = atoi(tf.peerlist[2].end_byte.c_str());
+			prev_byte_4 = atoi(tf.peerlist[3].end_byte.c_str());
+			prev_byte_5 = atoi(tf.peerlist[4].end_byte.c_str());
+
+			if(CLIENT_ID == 6) {
+				cout << "CHUNK " << j << ":" << endl; 
+			}
 			for(int i = 0; i < 5; i++) {
 				p[i].name = tf.filename;
 				p[i].start_byte = tf.peerlist[i].start_byte;
-				p[i].end_byte = tf.peerlist[i].end_byte;
-				if(CLIENT_ID == 6) {				
-				cout << "thread " << i+1 << " peer " << i << " start byte " << p[i].start_byte << endl;				
-				cout << "thread " << i+1 << " peer " << i << " end byte " << p[i].end_byte << endl;								
+				p[i].end_byte = tf.peerlist[i].end_byte;				
+				if(CLIENT_ID == 6) {
+
+					cout << "Client " << CLIENT_ID << " thread " << i+1 << " peer " << i << " start byte " << p[i].start_byte << endl;				
+					cout << "Client " << CLIENT_ID << " thread " << i+1 << " peer " << i << " end byte " << p[i].end_byte << endl;								
 				}
+
 				p[i].sockid = setupConnections();
 				p[i].threadid = i+1;
 			}
@@ -224,27 +210,26 @@ void main_rcv(int sock_id) {
 			pthread_join(t2, NULL) == 0 &&
 			pthread_join(t3, NULL) == 0 &&
 			pthread_join(t4, NULL) == 0 &&
-			pthread_join(t5, NULL) == 0) {				
-				// cout << "All threads complete." << endl;
+			pthread_join(t5, NULL) == 0) {	
 			}			
 			j++;
 		}
-		sleep(1);
+		usleep(500000);		
 	}
 
+	pthread_mutex_destroy(&dwnld_lock);	
+	pthread_mutex_destroy(&connection_lock);						
 	writeToFile("picture-wallpaper.jpg");
-
-	// processGetCommand(sock_id, "picture-wallpaper.jpg");
 }
 
-void main_snd(int sock_id) {
-	// sharedFilePath += CLIENT_ID;	
+void main_snd() {
+	int sock_id = setupConnections();
 	processCreateTrackerCommand(sock_id);	
 
 	for(int i = 0; i < 4; i++) {
 		calculateChunk(i);
 		cout << "I am client_" << CLIENT_ID << ", and I am advertising the following chunk of the file: ";
-		cout << ceil((CURRENT_CHUNK_BEGIN / float(TOTAL_FILE_SIZE))*100) << "% to "; 
+		cout << ceil((CURRENT_CHUNK_BEGIN / float(TOTAL_FILE_SIZE))*100) + 1 << "% to "; 
 		cout << ceil((CURRENT_CHUNK_END / float(TOTAL_FILE_SIZE))*100)  << "%" << endl;
 		sock_id = setupConnections();
 		processUpdateTrackerCommand(sock_id);
@@ -255,7 +240,6 @@ void main_snd(int sock_id) {
 void *run(void *param) {
 	struct ThreadParams *reformedParam = (struct ThreadParams *) param;
 	processGetCommand(reformedParam->sockid, reformedParam->name, reformedParam->start_byte, reformedParam->end_byte, reformedParam->threadid);
-	// pthread_yield();	
 	close(reformedParam->sockid);
 	pthread_exit(0);
 }
@@ -263,53 +247,22 @@ void *run(void *param) {
 void getWorkingDirectory() {
 	char cwd[100];	
 	stringstream ss;	
-	// struct stat st = {0};
 
 	if(getcwd(cwd, sizeof(cwd))==NULL) {
 		exit(1);
 	}
 
 	sharedFilePath = cwd;
-	// sharedFilePath.erase(sharedFilePath.length() - 3, 3);
 	sharedFilePath += "/test_clients/client_";
 	ss << CLIENT_ID;
 	sharedFilePath += ss.str();
-	// trackerFilePath 
-	// trackerFilePath += "/trackers";
-	// if(stat(sharedFilePath.c_str(), &st)) {
-		// cout << "mkdir" << endl;
-		// mkdir(sharedFilePath.c_str(), 0700);
-		// printf("Could not determine filepath: %s\n", sharedFilePath.c_str());
-	// }
 	sharedFilePath += "/";
-
-	// if(stat(trackerFilePath.c_str(), &st)) {
-	// 	mkdir(trackerFilePath.c_str(), 0700);
-	// }
-	// trackerFilePath += "/";
-}
-
-void loadConfig() {
-	ifstream fin("config.txt");
-	string line;
-	while (getline(fin, line)) {
-		istringstream sin(line.substr(line.find("=") + 1));
-		if (line.find("PORT") != -1) {
-			sin >> configFile.port_num;
-		}		
-		else if (line.find("IPADDRESS") != -1) {
-			sin >> configFile.ip_addr;
-		}
-		else if (line.find("UPDATETIME") != -1) {
-			sin >> configFile.update_time;
-		}
-	}
 }
 
 int setupConnections() {
 	int sockid;
+	bool successful = false;
 	struct sockaddr_in server_addr;
-	// int server_port=5001;
 
 	if ((sockid = socket(AF_INET,SOCK_STREAM,0))==-1){//create socket
 		printf("socket cannot be created\n"); exit(0);
@@ -318,9 +271,17 @@ int setupConnections() {
     server_addr.sin_family = AF_INET;//host byte order
     server_addr.sin_port = htons(3456);// convert to network byte order
     server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
-		cout << errno << endl; printf("Cannot connect to server\n"); exit(0);
+    pthread_mutex_lock(&connection_lock);
+    while(!successful) {
+	    if (connect(sockid ,(struct sockaddr *) &server_addr, sizeof(struct sockaddr))==-1){//connect and error check
+			cout << errno << endl; printf("Cannot connect to server\n");
+			if(errno == 22)
+				exit(1);
+		} else {
+			successful = true;
+		}		
 	}
+	pthread_mutex_unlock(&connection_lock);
 
 	return sockid;
 }
@@ -332,6 +293,7 @@ void processCreateTrackerCommand(int sockid) {
 	struct stat statbuf;
 	char buffer[20];
 	int length;
+	bool createSuccessful = false;
 
 	FD = opendir(sharedFilePath.c_str());
 	if(FD == NULL) {
@@ -349,15 +311,13 @@ void processCreateTrackerCommand(int sockid) {
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
 			strcpy(FullName, sharedFilePath.c_str());
-			// strcat(FullName, "/");
 			strcat(FullName, in_file->d_name);
-			// cout << FullName << endl;
 			stat(FullName, &statbuf);
 			free(FullName);
 			list_req += " ";
 			list_req += in_file->d_name;
 			list_req += " ";
-			snprintf(buffer, 20, "%d", statbuf.st_size);
+			snprintf(buffer, 20, "%d", (int)statbuf.st_size);
 			sscanf(buffer, "%d", &TOTAL_FILE_SIZE);					
 			list_req += buffer;
 			list_req += " ";
@@ -385,18 +345,21 @@ void processCreateTrackerCommand(int sockid) {
 			ss << CLIENT_ID;
 			list_req += ss.str();
 
-			// cout << list_req << endl;
-			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
-				printf("Send_request failure\n"); exit(0);
+			while(!createSuccessful) {
+				if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
+					printf("Send_request failure\n"); exit(0);
+				} else {
+					createSuccessful = true;
+				}
 			}
 
-		    if((length = read(sockid, &msg, 100) < 0)){// read what server has said
-				printf("Read failure\n"); exit(0); 
+		    if((length = recv(sockid, &msg, 100, 0) < 0)){// read what server has said
+				printf("Read failure (create tracker) with error %d\n", errno); exit(0); 
 			}
 
+			cout << msg << endl;
 			msg[100] = '\0';
 			list_req="";
-			// cout << "Receiving create tracker response: " << msg << endl;
 			close(sockid);				
 			sockid = setupConnections();	
 		}
@@ -407,34 +370,16 @@ void processCreateTrackerCommand(int sockid) {
 
 void calculateChunk(int iteration) {
 	int client_chunk_begin;
-	// int client_chunk_end;
 
-	// R1 = TOTAL_FILE_SIZE % 5;
 	CHUNK_SIZE = TOTAL_FILE_SIZE / 5;
-	// cout << TOTAL_FILE_SIZE << endl;
-	// cout << CHUNK_SIZE << endl;
-	// R2 = CHUNK_SIZE % 4;
 	QUARTER_CHUNK_SIZE = CHUNK_SIZE / 4;
 
 	client_chunk_begin = (QUARTER_CHUNK_SIZE * 4) * (CLIENT_ID - 1);
-	// if(client_chunk_begin != 0)
-		// client_chunk_begin++;
-	// client_chunk_end = (QUARTER_CHUNK_SIZE * 4) * CLIENT_ID;
-	// if(CLIENT_ID == 5) 
-	// 	client_chunk_end += 3;
-
 	CURRENT_CHUNK_BEGIN = client_chunk_begin + (QUARTER_CHUNK_SIZE * iteration);
 	CURRENT_CHUNK_END = client_chunk_begin + (QUARTER_CHUNK_SIZE * (iteration + 1)) - 1;
-	// if(CURRENT_CHUNK_BEGIN != 0) {
-		// CURRENT_CHUNK_BEGIN++;	
-		// CURRENT_CHUNK_END++;
-	// }
+
 	if(iteration == 3 && CLIENT_ID == 5)
 		CURRENT_CHUNK_END = TOTAL_FILE_SIZE; 
-
-	// cout << "Starting byte " << CURRENT_CHUNK_BEGIN << endl;
-	// cout << "Ending byte " << CURRENT_CHUNK_END << endl;
-	// cout << "Difference " << CURRENT_CHUNK_END - CURRENT_CHUNK_BEGIN << endl;
 }
 
 void processUpdateTrackerCommand(int sockid) {
@@ -445,11 +390,12 @@ void processUpdateTrackerCommand(int sockid) {
 	char buffer[20];
 	int length;
 	stringstream ss;
-	// ss << configFile.port_num;
-	// string port = ss.str();
+	bool updateSuccessful = false;
+	int totalBytesSent = 0;
+	int bytesSentThisTime = 0;
 
 	if(NULL == (FD = opendir(sharedFilePath.c_str()))) {
-		cout << "error" << endl;
+		cout << "error opening file for update" << endl;
 	}
 
 	while((in_file = readdir(FD))) {
@@ -462,7 +408,7 @@ void processUpdateTrackerCommand(int sockid) {
 			strcat(FullName, in_file->d_name);
 			stat(FullName, &statbuf);
 			free(FullName);
-			snprintf(buffer, 20, "%d", statbuf.st_size);
+			snprintf(buffer, 20, "%d", (int)statbuf.st_size);
 
 			list_req += " ";
 			list_req += in_file->d_name;
@@ -483,22 +429,31 @@ void processUpdateTrackerCommand(int sockid) {
 			list_req += " ";
 			ss << CLIENT_ID;
 			list_req += ss.str();
-			// cout << list_req << endl;
-			if((write(sockid, list_req.c_str(), list_req.size())) < 0){//inform the server of the list request
-				printf("Send_request failure\n"); exit(0);
+			// cout << CURRENT_CHUNK_BEGIN << endl;
+			// cout << CURRENT_CHUNK_END << endl;
+			cout << list_req << endl;
+			while(!updateSuccessful && totalBytesSent < list_req.size()) {
+				bytesSentThisTime = write(sockid, list_req.c_str(), list_req.size());
+				totalBytesSent += bytesSentThisTime;
+				// cout << "Bytes sent: " << totalBytesSent << " && " << " Bytes desired: " << list_req.size();
+				if(bytesSentThisTime < 0){//inform the server of the list request
+					printf("Send_request failure\n");	
+					updateSuccessful = false;														
+				} else {
+					updateSuccessful = true;
+				}
 			}
 
-		    if((length = read(sockid, &msg, 100) < 0)){// read what server has said
-				printf("Read failure\n"); exit(0); 
+		    if((length = recv(sockid, &msg, 100, 0) < 0)){// read what server has said
+				printf("Read failure (update tracker) with error %d\n", errno); exit(0); 
 			}
 
+			cout << msg << endl;
 			msg[100] = '\0';
 			list_req="";
-			// cout << "Receiving update tracker response: " << msg << endl;
 			close(sockid);
 			sockid = setupConnections();
-
-		}
+		}		
 	}
 	
 	close(sockid);
@@ -518,19 +473,13 @@ string processListCommand(int sockid) {
 	}
 	
 	msg[length+1] = '\0';
-	// cout << msg << endl;
 	close(sockid);
 
 	return msg;
 }
 
 void processGetCommand(int sockid, string filename, string start_byte, string end_byte, int threadid) {
-	// string tfile = requestTrackerFile(sockid, file);
-	// TrackerFile tf = parseTrackerFile(tfile);
-
-	// sockid = setupConnections();
 	downloadFile(filename, start_byte, end_byte, sockid, threadid);
-	// close(sockid);
 }
 
 string requestTrackerFile(int sockid, string file) {
@@ -541,31 +490,22 @@ string requestTrackerFile(int sockid, string file) {
 	int fr_block_size;
 	int write_size;
 	bool isBody;
-	TrackerFile tf;
+	FILE *fr;
 
 	list_req += file;
 	strcpy(fpath, sharedFilePath.c_str());
 	strcat(fpath, file.c_str());
 	strcat(fpath, ".track");
 
-	// cout << fpath << endl;
-	FILE *fr = fopen(fpath, "wb");
-	if (fr == NULL) {
-		cout << "File cannot be opened" << endl;
-		exit(1);
-	}	
 
-	// cout << list_req << endl;
 	if((write(sockid,list_req.c_str(), list_req.size())) < 0){
 		printf("Send_request  failure\n"); exit(0);
 	}
-	// cout << "wrote request" << endl;
 
 	bzero(recvBuf, MAX_RECV_LENGTH);
 	bzero(messageBody, MAX_RECV_LENGTH);
 	int j = 0;
-	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-		// if(fr_block_size!=-1) cout << fr_block_size << endl;
+	while((fr_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) {
 		for(int i = 0; i < strlen(recvBuf); i++) {			
 			if(recvBuf[i] == '<') {
 				isBody = false;
@@ -577,18 +517,24 @@ string requestTrackerFile(int sockid, string file) {
 			if(recvBuf[i] == '\n') {
 				isBody = true;
 			}
-			// cout << "for loop" << endl;
 		}
-		// cout << "while loop" << endl;
+
 		bzero(recvBuf, MAX_RECV_LENGTH);		
 	}
-	// cout << "done looping" << endl;
-	write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
-	// cout << "written" << endl;
-	fclose(fr);
-	// cout << "closed" << endl;
+
+	if(strlen(messageBody) > 0) {
+		fr = fopen(fpath, "wb");
+
+		if (fr == NULL) {
+			cout << "File cannot be opened" << endl;
+			return "";
+		}
+
+		write_size = fwrite(messageBody, sizeof(char), strlen(messageBody), fr);
+		fclose(fr);
+	}
+
 	close(sockid);
-	// cout << "closed" << endl;
 	return fpath;
 }
 
@@ -596,9 +542,16 @@ TrackerFile parseTrackerFile(string tfile) {
 	ifstream in;
 	TrackerFile tf;
 	PeerInfo pi;
+	int peerCount = 0;
 	if(in.good()) {
 		in.open(tfile.c_str());
 	}
+
+	if(in.eof()) {
+		tf.isNULL = true; 
+		return tf;
+	}
+
 
 	getline(in, tf.filename);
 	getline(in, tf.filesize);
@@ -611,68 +564,106 @@ TrackerFile parseTrackerFile(string tfile) {
 		getline(in, pi.end_byte, ':');
 		getline(in, pi.timestamp, ':');
 		getline(in, pi.client_id);
-		if(!in.eof())
+		if(!in.eof()) {
+			peerCount++;
 			tf.peerlist.push_back(pi);
+		}
 	}
 
 	sort(tf.peerlist.begin(), tf.peerlist.end(), sort_func);
+	if(peerCount != 5)
+		tf.isNULL = true;
+	else
+		tf.isNULL = false;
 
 	return tf;
 }
 
 void downloadFile(string filename, string start_byte, string end_byte, int sockid, int threadid) {
-	// char fpath[100];
 	char recvBuf[10000];
 	int fd_block_size = 0;
-	// int write_size;
+	int rcvdThisTime = 0;
+	bool downloadInProgress = true;
 	stringstream ss;
 	ss << threadid;
 	string download_req = "download " + filename + " " + start_byte + " " + end_byte + " " + ss.str();	
 
-	// strcpy(fpath, sharedFilePath.c_str());
-	// strcat(fpath, filename.c_str());	
-	// FILE *fd = fopen(fpath, "wb");
-	// if(fd == NULL) {
-		// cout << "File cannot be opened" << endl;
-		// exit(1);
-	// }
 
-	if((write(sockid, download_req.c_str(), download_req.size())) < 0) {
-		printf("Send request failure\n");
+	pthread_mutex_lock(&dwnld_lock);
+	while(downloadInProgress) {
+
+		if((write(sockid, download_req.c_str(), download_req.size())) < 0) {
+			printf("Send request failure\n"); 
+			continue;
+		}
+	
+		bzero(recvBuf, 10000);
+		switch(threadid) {
+			case 1:
+				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
+					THREAD1_RECVSIZE += fd_block_size;
+					rcvdThisTime += fd_block_size; 
+					memcpy(&THREAD1_RECVBUF[THREAD1_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
+				}			
+				if(fd_block_size == 0)
+					downloadInProgress = false;//cout << "error downloading, errno " << errno << endl;
+				else 
+					THREAD1_RECVSIZE -= rcvdThisTime;
+				cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
+				break;
+			case 2:
+				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
+					THREAD2_RECVSIZE += fd_block_size;
+					rcvdThisTime += fd_block_size;
+					memcpy(&THREAD2_RECVBUF[THREAD2_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
+				}
+				if(fd_block_size == 0) 
+					downloadInProgress = false;//cout << "error downloading, errno " << errno << endl;
+				else
+					THREAD2_RECVSIZE -= rcvdThisTime;
+				cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
+				break;
+			case 3:
+				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
+					THREAD3_RECVSIZE += fd_block_size; 
+					rcvdThisTime += fd_block_size;
+					memcpy(&THREAD3_RECVBUF[THREAD3_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
+				}
+				if(fd_block_size == 0) 
+					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+				else
+					THREAD3_RECVSIZE -= rcvdThisTime;
+				cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
+				break;
+			case 4:
+				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
+					THREAD4_RECVSIZE += fd_block_size; 
+					rcvdThisTime += fd_block_size;
+					memcpy(&THREAD4_RECVBUF[THREAD4_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
+				}
+				if(fd_block_size == 0) 
+					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+				else
+					THREAD4_RECVSIZE -= rcvdThisTime;
+				cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
+				break;
+			case 5:
+				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
+					THREAD5_RECVSIZE += fd_block_size; 
+					rcvdThisTime += fd_block_size;
+					memcpy(&THREAD5_RECVBUF[THREAD5_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
+				}
+				if(fd_block_size == 0) 
+					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+				else
+					THREAD5_RECVSIZE -= rcvdThisTime;
+				cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
+				break;
+		}
+		close(sockid);
+		sockid = setupConnections();
 	}
-
-	bzero(recvBuf, 10000);
-	// cout << "Downloading...";
-
-	switch(threadid) {
-		case 1:
-			while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) { THREAD1_RECVSIZE += fd_block_size; memcpy(&THREAD1_RECVBUF[THREAD1_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); }
-			break;
-		case 2:
-			while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) { THREAD2_RECVSIZE += fd_block_size; memcpy(&THREAD2_RECVBUF[THREAD2_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); }
-			break;
-		case 3:
-			while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) { THREAD3_RECVSIZE += fd_block_size; memcpy(&THREAD3_RECVBUF[THREAD3_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); }
-			break;
-		case 4:
-			while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) { THREAD4_RECVSIZE += fd_block_size; memcpy(&THREAD4_RECVBUF[THREAD4_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); }
-			break;
-		case 5:
-			while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) { THREAD5_RECVSIZE += fd_block_size; memcpy(&THREAD5_RECVBUF[THREAD5_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); }
-			break;
-	}
-
-	// cout << "Downloaded " << fd_block_size << " bytes to client " << CLIENT_ID << " thread " << threadid << endl;
-	// while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0))) {
-	// 	// write_size = fwrite(recvBuf, sizeof(char), fd_block_size, fd);
-	// 	// bzero(recvBuf, MAX_RECV_LENGTH);
-	// }
-
-	// fseek(fd, 0, SEEK_END);
-	// cout << "Received " << ftell(fd) << " bytes..." << endl;
-	// rewind(fd);
-	// fclose(fd);
-	// writeToFile("picture-wallpaper.jpg");
+	pthread_mutex_unlock(&dwnld_lock);
 }
 
 void writeToFile(string filename) {
@@ -686,15 +677,15 @@ void writeToFile(string filename) {
 		exit(1);
 	}
 
-	fwrite(THREAD1_RECVBUF, sizeof(char), THREAD1_RECVSIZE,fd);
+	fwrite(THREAD1_RECVBUF, sizeof(char), THREAD1_RECVSIZE, fd);
 	cout << "1st chunk size " << THREAD1_RECVSIZE << endl;
-	fwrite(THREAD2_RECVBUF, sizeof(char), THREAD2_RECVSIZE,fd);
+	fwrite(THREAD2_RECVBUF, sizeof(char), THREAD2_RECVSIZE, fd);
 	cout << "2nd chunk size " << THREAD2_RECVSIZE << endl;
-	fwrite(THREAD3_RECVBUF, sizeof(char), THREAD3_RECVSIZE,fd);
+	fwrite(THREAD3_RECVBUF, sizeof(char), THREAD3_RECVSIZE, fd);
 	cout << "3rd chunk size " << THREAD3_RECVSIZE << endl;
-	fwrite(THREAD4_RECVBUF, sizeof(char), THREAD4_RECVSIZE,fd);
+	fwrite(THREAD4_RECVBUF, sizeof(char), THREAD4_RECVSIZE, fd);
 	cout << "4th chunk size " << THREAD4_RECVSIZE << endl;
-	fwrite(THREAD5_RECVBUF, sizeof(char), THREAD5_RECVSIZE,fd);
+	fwrite(THREAD5_RECVBUF, sizeof(char), THREAD5_RECVSIZE, fd);
 	cout << "5th chunk size " << THREAD5_RECVSIZE << endl;
 
 	fseek(fd, 0, SEEK_END);

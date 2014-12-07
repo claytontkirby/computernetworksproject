@@ -7,6 +7,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <signal.h>
 #include <sstream>
 #include <stdio.h>
@@ -29,6 +30,8 @@ int PORT = 0;
 int numThreads = 0;
 time_t timer;
 struct tm newyear;
+pthread_mutex_t fileWriteLock;
+pthread_mutexattr_t attr;
 
 struct PeerInfo {
 	string ip;
@@ -99,7 +102,7 @@ bool writeTrackerFile(TrackerFile &tf);
 int main(int argc, char* argv[]){
 	int sockid;
 
-	if(argv[1] == "localhost") 
+	if(strcmp(argv[1],"localhost") == 0) 
 		IP = INADDR_LOOPBACK;
 	else
 		IP = atoi(argv[1]);
@@ -116,19 +119,23 @@ int main(int argc, char* argv[]){
 
 	// outputNetworkInfo(sockid);
 
+	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&fileWriteLock, &attr);
+
 	while(true){
-		cout << endl;
-		cout << "Tracker server listening for incoming connections..." << endl;
+		// cout << endl;
+		// cout << "Tracker server listening for incoming connections..." << endl;
 		
 		// sockid = setupSocketConnections();
 
-		if (listen(sockid, numThreads) < 0){ //(parent) process listens at sockid and check error
+		if (listen(sockid, 100) < 0){ //(parent) process listens at sockid and check error
 			printf(" Tracker SERVER CANNOT LISTEN %d\n", errno); exit(0);
 		}
 
 		listenForConnections(sockid);
 		// cout << "listened" << endl;
 	}         
+	pthread_mutex_destroy(&fileWriteLock);
 }
     
 void getWorkingDirectory() {
@@ -263,33 +270,39 @@ void listenForConnections(int sockid) {
 		   printf("Tracker Cannot accept...\n"); exit(0); 
 	}
 
-	if(numThreads > 0) {		
+	// while(numThreads > 0) {
+
 		if ((pid=fork())==0) {//New child process will serve the requester client. separate child will serve separate client
 		   numThreads--;
 		   close(sockid);   //child does not need listener
 		   peer_handler(sockchild);//child is serving the client.
+		   // trackerFiles.clear();
 		   // cout << "peer handled" << endl;	   
 		   close(sockchild);// printf("\n 1. closed");	   
 		   numThreads++;
 		   // cout << "about to exit" << endl;
 		   // kill(getpid(), SIGKILL);
-		   _exit(0);         // kill the process. child process all done with work
-	    }
-	}
+		   exit(0);         // kill the process. child process all done with work
+	    }	
 	close(sockchild);  // parent all done with client, only child will communicate with that client from now
+// }
 	// cout << "leaving" << endl;
 	// close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
 
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
-	int length;
+	int length = -1;
 	char read_msg[301];
-	bzero(read_msg, 301);
 	// cout << "about to read" << endl;
-	length=read(sock_child, &read_msg, 300);
+	while(length < 0) {
+		bzero(read_msg, 301);
+		length=read(sock_child, &read_msg, 300);
+		cout << "length: " << length << endl;	
+	}
 	// cout << read_msg << endl;
 	read_msg[length+1]='\0';
+	pthread_mutex_lock(&fileWriteLock);
 	loadTrackerFiles();
 
 	cout << "Message received: " << read_msg << endl;
@@ -307,10 +320,11 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		handle_updatetracker_req(sock_child, read_msg);	
 	} else if(strstr(read_msg, "download") != NULL) {
 		handle_download(sock_child, read_msg);
-		cout << "download handled" << endl;
+		// cout << "download handled" << endl;
 	}
-	
 	trackerFiles.clear();
+	pthread_mutex_unlock(&fileWriteLock);
+	// trackerFiles.clear();
 }//end client handler function
 
 void handle_createtracker_req(int sock_child, char* read_msg) {
@@ -327,6 +341,7 @@ string createTrackerFile(char* read_msg) {
 	FILE *fp;
 	string err = "<createtracker fail>";
 
+	// pthread_mutex_lock(&fileWriteLock);
 	fp = fopen((trackerFilePath + "/" + tf.filename + ".track").c_str(), "r");
 
 	if(fp) {
@@ -363,6 +378,7 @@ string createTrackerFile(char* read_msg) {
 	if(fp != NULL) {
 		fclose(fp);	
 	}
+	// pthread_mutex_unlock(&fileWriteLock);
 
 	trackerFiles.push_back(tf);
 	return "<createtracker succ>";
@@ -465,8 +481,9 @@ void handle_get_req(int sock_child, char* read_msg) {
 		cout << "Error sending GET response header" << endl;
 	}
 	bzero(sendBuf, MAX_SEND_LENGTH);
-	cout << "Sending tracker file to peer..." << endl;
+	// cout << "Sending tracker file to peer..." << endl;
 	while((fileBlockSize = fread(sendBuf, sizeof(char), MAX_SEND_LENGTH, fs))) {
+		// cout << "Sending " << fileBlockSize << " bytes of tracker file" << endl;
 		if(send(sock_child, sendBuf, fileBlockSize, 0) < 0) {
 			cout << "Error sending tracker file" << endl;
 		}
@@ -523,7 +540,7 @@ void handle_download(int sock_child, char* read_msg) {
 		// if(dr.client_id == "5")
 			// cout << "bytes sent " << bytes_sent << endl;
 		if((bytes_sent += send(sock_child, sendBuf, fileBlockSize, 0)) < 0) {
-			cout << "Error sending requested file" << endl;
+			cout << "Error sending requested file" << endl; exit(0);
 		}
 		// cout << bytes_sent << endl;
 	}
@@ -572,8 +589,10 @@ bool writeTrackerFile(TrackerFile &tf) {
 		if(fputs((tf.peerlist[i].port.c_str()), fd) == EOF) { return false;}
 		fputs(":", fd);
 		if(fputs(tf.peerlist[i].start_byte.c_str(), fd) == EOF) { return false;}
+		cout << "writing: " << tf.peerlist[i].start_byte << endl;
 		fputs(":", fd);
 		if(fputs(tf.peerlist[i].end_byte.c_str(), fd) == EOF) { return false;}
+		cout << "writing: " << tf.peerlist[i].end_byte << endl;
 		fputs(":", fd);
 		if(fputs(tf.peerlist[i].timestamp.c_str(), fd) == EOF) { return false;}
 		fputs(":", fd);
@@ -589,6 +608,7 @@ bool writeTrackerFile(TrackerFile &tf) {
 }
 
 string updateTrackerFile(char* read_msg) {	
+	cout << "updating tracker file with message: " << read_msg << endl;
 	char buff[100];
 	strcpy(buff, read_msg);
 	string result = "<updatetracker ";
@@ -598,10 +618,13 @@ string updateTrackerFile(char* read_msg) {
 	int idx = parseUpdateTrackerMsg(read_msg);
 
 	if(idx != -1) {
+		// pthread_mutex_lock(&fileWriteLock);
 		if(writeTrackerFile(trackerFiles[idx])) {
+			// pthread_mutex_unlock(&fileWriteLock);
 			result += " succ>";
 			return result;
 		} else {
+			// pthread_mutex_unlock(&fileWriteLock);
 			result += " fail>";
 			return result;
 		}
@@ -626,9 +649,11 @@ int parseUpdateTrackerMsg(char* read_msg) {
 			pi.ip = strtok(NULL, " ");
 			pi.port = strtok(NULL, " ");
 			pi.client_id = strtok(NULL, " ");
+			cout << pi.start_byte << endl;
+			cout << pi.end_byte << endl;
 			for(int j = 0; j < trackerFiles[i].peerlist.size(); j++) {
-				cout << pi.client_id << " = " << trackerFiles[i].peerlist[j].client_id << endl;
-				cout << trackerFiles[i].peerlist.size() << endl;
+				// cout << pi.client_id << " = " << trackerFiles[i].peerlist[j].client_id << endl;
+				// cout << trackerFiles[i].peerlist.size() << endl;
 				if(pi.client_id == trackerFiles[i].peerlist[j].client_id) {
 					trackerFiles[i].peerlist[j].start_byte = pi.start_byte;
 					trackerFiles[i].peerlist[j].end_byte = pi.end_byte;
@@ -649,5 +674,3 @@ int parseUpdateTrackerMsg(char* read_msg) {
 	}
 	return -1;
 }
-
-///@file

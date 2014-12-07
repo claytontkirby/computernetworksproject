@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#clear screen
+clear
+
 #remove tracker and image files
 rm -f test_clients/client_6/*.track 
 rm -f test_clients/client_6/*.jpg

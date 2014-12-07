@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#clear screen
+clear
+
+#run sending clients
 ./client.out snd 1 &
 
 ./client.out snd 2 &
