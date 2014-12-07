@@ -95,9 +95,11 @@ void handle_updatetracker_req(int sock_child, char* read_msg);
 
 string updateTrackerFile(char* read_msg);
 
-int parseUpdateTrackerMsg(char* read_msg);
+PeerInfo parseUpdateTrackerMsg(char* read_msg);
 
 bool writeTrackerFile(TrackerFile &tf);
+
+bool appendTrackerFile(TrackerFile &tf);
 
 int main(int argc, char* argv[]){
 	int sockid;
@@ -119,10 +121,10 @@ int main(int argc, char* argv[]){
 
 	// outputNetworkInfo(sockid);
 
-	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-	pthread_mutex_init(&fileWriteLock, &attr);
 
 	while(true){
+	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&fileWriteLock, &attr);
 		// cout << endl;
 		// cout << "Tracker server listening for incoming connections..." << endl;
 		
@@ -134,8 +136,9 @@ int main(int argc, char* argv[]){
 
 		listenForConnections(sockid);
 		// cout << "listened" << endl;
-	}         
 	pthread_mutex_destroy(&fileWriteLock);
+	pthread_mutexattr_destroy(&attr);
+	}         
 }
     
 void getWorkingDirectory() {
@@ -302,6 +305,7 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 	}
 	// cout << read_msg << endl;
 	read_msg[length+1]='\0';
+	// cout << "Client is: " << read_msg[length] << endl;
 	pthread_mutex_lock(&fileWriteLock);
 	loadTrackerFiles();
 
@@ -322,6 +326,7 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 		handle_download(sock_child, read_msg);
 		// cout << "download handled" << endl;
 	}
+
 	trackerFiles.clear();
 	pthread_mutex_unlock(&fileWriteLock);
 	// trackerFiles.clear();
@@ -471,6 +476,7 @@ void handle_get_req(int sock_child, char* read_msg) {
 	strcpy(filePathBuf, trackerFilePath.c_str());
 	strcat(filePathBuf, filename.c_str());
 	strcat(filePathBuf, ".track");
+	// pthread_mutex_lock(&fileWriteLock);
 	FILE *fs = fopen(filePathBuf, "rb");
 	if(fs == 0) {
 		cout << "error opening file " << errno << endl;
@@ -498,6 +504,7 @@ void handle_get_req(int sock_child, char* read_msg) {
 	}
 
 	fclose(fs);	
+	// pthread_mutex_unlock(&fileWriteLock);
 }
 
 string parseGetRequest(char* read_msg) {
@@ -565,11 +572,16 @@ DownloadReq parseDownloadRequest(char* read_msg) {
 }
 
 void handle_updatetracker_req(int sock_child, char* read_msg) {
+	// pthread_mutex_lock(&fileWriteLock);
+	// trackerFiles.clear();
+	// loadTrackerFiles();
 	string msg = updateTrackerFile(read_msg);
 	cout << "Sending response: " << msg << endl;
 	if((write(sock_child, msg.c_str(), 100)) < 0){
 		printf("Send_request  failure\n"); exit(0);
 	}
+	// trackerFiles.clear();
+	// pthread_mutex_unlock(&fileWriteLock);
 }
 
 bool writeTrackerFile(TrackerFile &tf) {
@@ -607,6 +619,33 @@ bool writeTrackerFile(TrackerFile &tf) {
 	return true;
 }
 
+bool appendTrackerFile(PeerInfo &pi) {
+	FILE *fd;
+	fd = fopen((trackerFilePath + "/picture-wallpaper.jpg.track").c_str(), "a");
+	// for(int i = 0; i < tf.peerlist.size(); i++) {
+		if(fputs((pi.ip.c_str()), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs((pi.port.c_str()), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs(pi.start_byte.c_str(), fd) == EOF) { return false;}
+		cout << "writing: " << pi.start_byte << endl;
+		fputs(":", fd);
+		if(fputs(pi.end_byte.c_str(), fd) == EOF) { return false;}
+		cout << "writing: " << pi.end_byte << endl;
+		fputs(":", fd);
+		if(fputs(pi.timestamp.c_str(), fd) == EOF) { return false;}
+		fputs(":", fd);
+		if(fputs(pi.client_id.c_str(), fd) == EOF) { return false;}
+		fputs("\n", fd);
+	// }
+
+	if(fd != NULL) {
+		fclose(fd);
+	}
+
+	return true;
+}
+
 string updateTrackerFile(char* read_msg) {	
 	cout << "updating tracker file with message: " << read_msg << endl;
 	char buff[100];
@@ -615,11 +654,11 @@ string updateTrackerFile(char* read_msg) {
 	strtok(buff, " ");
 	result += strtok(NULL, " ");
 	// loadTrackerFiles();
-	int idx = parseUpdateTrackerMsg(read_msg);
+	PeerInfo pi = parseUpdateTrackerMsg(read_msg);
 
-	if(idx != -1) {
+	// if(idx != -1) {
 		// pthread_mutex_lock(&fileWriteLock);
-		if(writeTrackerFile(trackerFiles[idx])) {
+		if(appendTrackerFile(pi)) {
 			// pthread_mutex_unlock(&fileWriteLock);
 			result += " succ>";
 			return result;
@@ -628,13 +667,13 @@ string updateTrackerFile(char* read_msg) {
 			result += " fail>";
 			return result;
 		}
-	}
+	// }
 
 	result += " ferr>";
 	return result;
 }
 
-int parseUpdateTrackerMsg(char* read_msg) {
+PeerInfo parseUpdateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
 	char timeString[100];
 	string filename;
@@ -642,35 +681,38 @@ int parseUpdateTrackerMsg(char* read_msg) {
 
 	strtok(msg, " ");
 	filename = strtok(NULL, " ");
-	for(int i = 0; i < trackerFiles.size(); i++) {	
-		if(trackerFiles[i].filename == filename) {
-			pi.start_byte = strtok(NULL, " ");
-			pi.end_byte = strtok(NULL, " ");
-			pi.ip = strtok(NULL, " ");
-			pi.port = strtok(NULL, " ");
-			pi.client_id = strtok(NULL, " ");
-			cout << pi.start_byte << endl;
-			cout << pi.end_byte << endl;
-			for(int j = 0; j < trackerFiles[i].peerlist.size(); j++) {
-				// cout << pi.client_id << " = " << trackerFiles[i].peerlist[j].client_id << endl;
-				// cout << trackerFiles[i].peerlist.size() << endl;
-				if(pi.client_id == trackerFiles[i].peerlist[j].client_id) {
-					trackerFiles[i].peerlist[j].start_byte = pi.start_byte;
-					trackerFiles[i].peerlist[j].end_byte = pi.end_byte;
-					trackerFiles[i].peerlist[j].ip = pi.ip;
-					trackerFiles[i].peerlist[j].port = pi.port;
-					time(&timer);
-					sprintf(timeString, "%.f", difftime(timer, mktime(&newyear))); 
-					trackerFiles[i].peerlist[j].timestamp = timeString;	
-					trackerFiles[i].peerlist[j].client_id = pi.client_id;
-					return i;
-				} 
-				// else {
-				// 	return -1;
-				// }
+	pi.start_byte = strtok(NULL, " ");
+	pi.end_byte = strtok(NULL, " ");
+	pi.ip = strtok(NULL, " ");
+	pi.port = strtok(NULL, " ");
+	pi.client_id = strtok(NULL, " ");
+	time(&timer);
+	sprintf(timeString, "%.f", difftime(timer, mktime(&newyear))); 
+	pi.timestamp = timeString;
+	// for(int i = 0; i < trackerFiles.size(); i++) {	
+	// 	if(trackerFiles[i].filename == filename) {
+			
+	// 		// cout << pi.start_byte << endl;
+	// 		// cout << pi.end_byte << endl;
+	// 		for(int j = 0; j < trackerFiles[i].peerlist.size(); j++) {
+	// 			// cout << pi.client_id << " = " << trackerFiles[i].peerlist[j].client_id << endl;
+	// 			// cout << trackerFiles[i].peerlist.size() << endl;
+	// 			if(pi.client_id == trackerFiles[i].peerlist[j].client_id) {
+	// 				trackerFiles[i].peerlist[j].start_byte = pi.start_byte;
+	// 				trackerFiles[i].peerlist[j].end_byte = pi.end_byte;
+	// 				trackerFiles[i].peerlist[j].ip = pi.ip;
+	// 				trackerFiles[i].peerlist[j].port = pi.port;
+					
+					// trackerFiles[i].peerlist[j].timestamp = timeString;	
+					// trackerFiles[i].peerlist[j].client_id = pi.client_id;
+	// 				return trackerFiles[i].peerlist[j];
+	// 			} 
+	// 			// else {
+	// 			// 	return -1;
+	// 			// }
 
-			}			
-		}
-	}
-	return -1;
+	// 		}			
+	// 	}
+	// }
+	return pi;
 }

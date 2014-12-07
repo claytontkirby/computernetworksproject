@@ -85,7 +85,7 @@ int setupConnections();
 
 string requestTrackerFile(int sockid, string file);
 
-TrackerFile parseTrackerFile(string tfile);
+TrackerFile parseTrackerFile(string tfile, int prev_byte_1, int prev_byte_2, int prev_byte_3, int prev_byte_4, int prev_byte_5);
 
 void downloadFile(string filename, string start_byte, string end_byte, int sockid, int threadid);
 
@@ -130,11 +130,11 @@ int main(int argc, char *argv[]){
 void main_rcv() {
 	int sock_id;
 	pthread_t t1, t2, t3, t4, t5;
-	int prev_byte_1 = 999999;
-	int prev_byte_2 = 999999;
-	int prev_byte_3 = 999999;
-	int prev_byte_4 = 999999;
-	int prev_byte_5 = 999999;
+	int prev_byte_1 = 0;
+	int prev_byte_2 = 7144;
+	int prev_byte_3 = 14288;
+	int prev_byte_4 = 21432;
+	int prev_byte_5 = 28576;
 	int j = 1;
 	ThreadParams p[5];
 	string msg = "";
@@ -153,21 +153,21 @@ void main_rcv() {
 	pthread_mutex_init(&dwnld_lock, NULL);
 	pthread_mutex_init(&connection_lock, NULL);
 
-	while(j < 5 || prev_byte_5 != 35738) {
+	while(j < 5) {
 		// cout << "looping" << endl;		
 		sock_id = setupConnections();		
  		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
-		TrackerFile tf = parseTrackerFile(tfile);
+		TrackerFile tf = parseTrackerFile(tfile, prev_byte_1, prev_byte_2, prev_byte_3, prev_byte_4, prev_byte_5);
 		if(tf.isNULL == true) {
-			cout << "continuing" << endl;
+			// cout << "continuing" << endl;
 			usleep(500000);
 			continue;			
 		}
-		cout << "Prev byte 1: " << prev_byte_1 << " new byte: " << tf.peerlist[0].end_byte << endl; 
-		cout << "Prev byte 2: " << prev_byte_2 << " new byte: " << tf.peerlist[1].end_byte << endl; 
-		cout << "Prev byte 3: " << prev_byte_3 << " new byte: " << tf.peerlist[2].end_byte << endl; 
-		cout << "Prev byte 4: " << prev_byte_4 << " new byte: " << tf.peerlist[3].end_byte << endl; 
-		cout << "Prev byte 5: " << prev_byte_5 << " new byte: " << tf.peerlist[4].end_byte << endl;
+		// cout << "Prev byte 1: " << prev_byte_1 << " new byte: " << tf.peerlist[0].end_byte << endl; 
+		// cout << "Prev byte 2: " << prev_byte_2 << " new byte: " << tf.peerlist[1].end_byte << endl; 
+		// cout << "Prev byte 3: " << prev_byte_3 << " new byte: " << tf.peerlist[2].end_byte << endl; 
+		// cout << "Prev byte 4: " << prev_byte_4 << " new byte: " << tf.peerlist[3].end_byte << endl; 
+		// cout << "Prev byte 5: " << prev_byte_5 << " new byte: " << tf.peerlist[4].end_byte << endl;
 		// cout << tf.peerlist.size() << endl;
 		// cout << "new byte1: " << tf.peerlist[0]		
 		if(prev_byte_1 != atoi(tf.peerlist[0].end_byte.c_str()) &&
@@ -176,11 +176,11 @@ void main_rcv() {
 			prev_byte_4 != atoi(tf.peerlist[3].end_byte.c_str()) &&
 			prev_byte_5 != atoi(tf.peerlist[4].end_byte.c_str())) {
 
-			prev_byte_1 = atoi(tf.peerlist[0].end_byte.c_str());
-			prev_byte_2 = atoi(tf.peerlist[1].end_byte.c_str());
-			prev_byte_3 = atoi(tf.peerlist[2].end_byte.c_str());
-			prev_byte_4 = atoi(tf.peerlist[3].end_byte.c_str());
-			prev_byte_5 = atoi(tf.peerlist[4].end_byte.c_str());
+			prev_byte_1 = atoi(tf.peerlist[0].end_byte.c_str()) + 1;
+			prev_byte_2 = atoi(tf.peerlist[1].end_byte.c_str()) + 1;
+			prev_byte_3 = atoi(tf.peerlist[2].end_byte.c_str()) + 1;
+			prev_byte_4 = atoi(tf.peerlist[3].end_byte.c_str()) + 1;
+			prev_byte_5 = atoi(tf.peerlist[4].end_byte.c_str()) + 1;
 
 			if(CLIENT_ID == 6) {
 				cout << "CHUNK " << j << ":" << endl; 
@@ -214,7 +214,8 @@ void main_rcv() {
 			}			
 			j++;
 		}
-		usleep(500000);		
+		// usleep(500000);
+		sleep(1);		
 	}
 
 	pthread_mutex_destroy(&dwnld_lock);	
@@ -525,6 +526,7 @@ string requestTrackerFile(int sockid, string file) {
 	if(strlen(messageBody) > 0) {
 		fr = fopen(fpath, "wb");
 
+		// cout << "Received message of size: " << messageBody << endl;
 		if (fr == NULL) {
 			cout << "File cannot be opened" << endl;
 			return "";
@@ -538,7 +540,7 @@ string requestTrackerFile(int sockid, string file) {
 	return fpath;
 }
 
-TrackerFile parseTrackerFile(string tfile) {
+TrackerFile parseTrackerFile(string tfile, int prev_byte_1, int prev_byte_2, int prev_byte_3, int prev_byte_4, int prev_byte_5) {
 	ifstream in;
 	TrackerFile tf;
 	PeerInfo pi;
@@ -564,9 +566,18 @@ TrackerFile parseTrackerFile(string tfile) {
 		getline(in, pi.end_byte, ':');
 		getline(in, pi.timestamp, ':');
 		getline(in, pi.client_id);
-		if(!in.eof()) {
-			peerCount++;
-			tf.peerlist.push_back(pi);
+		// cout << "start: " << pi.start_byte << endl;
+		// cout << "end: " << pi.end_byte << endl;
+		if(!in.eof() && (
+			(atoi(pi.end_byte.c_str()) == prev_byte_1 + 1785) ||
+			(atoi(pi.end_byte.c_str()) == prev_byte_2 + 1785) ||
+			(atoi(pi.end_byte.c_str()) == prev_byte_3 + 1785) ||
+			(atoi(pi.end_byte.c_str()) == prev_byte_4 + 1785) ||
+			(atoi(pi.end_byte.c_str()) == (prev_byte_5 == 33934 ? prev_byte_5 + 1804 : prev_byte_5 + 1785)))) {
+			if(!((atoi(pi.start_byte.c_str()) == 0) && atoi(pi.end_byte.c_str()) == 35738)) {
+				peerCount++;
+				tf.peerlist.push_back(pi);
+			}
 		}
 	}
 

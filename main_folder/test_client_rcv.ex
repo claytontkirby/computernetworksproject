@@ -4,16 +4,11 @@
 clear
 
 #remove tracker and image files
-rm -f test_clients/client_6/*.track 
-rm -f test_clients/client_6/*.jpg
-rm -f test_clients/client_7/*.track 
-rm -f test_clients/client_7/*.jpg
-rm -f test_clients/client_8/*.track 
-rm -f test_clients/client_8/*.jpg
-rm -f test_clients/client_9/*.track 
-rm -f test_clients/client_9/*.jpg
-rm -f test_clients/client_10/*.track 
-rm -f test_clients/client_10/*.jpg
+rm -f test_clients/client_6/*.*
+rm -f test_clients/client_7/*.*
+rm -f test_clients/client_8/*.*
+rm -f test_clients/client_9/*.*
+rm -f test_clients/client_10/*.*
 
 #run receiving client
 ./client.out rcv 6 &
