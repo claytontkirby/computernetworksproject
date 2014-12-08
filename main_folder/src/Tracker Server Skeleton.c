@@ -69,7 +69,7 @@ void setupTimer();
 
 int setupSocketConnections();
 
-void outputNetworkInfo(int sockid);
+// void outputNetworkInfo(int sockid);
 
 void listenForConnections(int sockid);
 
@@ -224,46 +224,46 @@ int setupSocketConnections() {
    return sockid;                                      
 }
 
-void outputNetworkInfo(int sockid) {
-	int family, s;
-	struct ifaddrs *ifa, *ifaddr;
-	struct sockaddr_in sin;
-	socklen_t len = sizeof(sin);
-	char host[NI_MAXHOST];
+// void outputNetworkInfo(int sockid) {
+// 	int family, s;
+// 	struct ifaddrs *ifa, *ifaddr;
+// 	struct sockaddr_in sin;
+// 	socklen_t len = sizeof(sin);
+// 	char host[NI_MAXHOST];
 
-	bzero(host, NI_MAXHOST);
+// 	bzero(host, NI_MAXHOST);
 
-	cout << "Tracker server network info..." << endl;
+// 	cout << "Tracker server network info..." << endl;
 
-	if(getsockname(sockid, (struct sockaddr *)&sin, &len) == -1) {
-		cout << "Error getting port from socket" << endl;
-	} else {
-		cout << "Port: " << ntohs(sin.sin_port) << endl;
-	}
+// 	if(getsockname(sockid, (struct sockaddr *)&sin, &len) == -1) {
+// 		cout << "Error getting port from socket" << endl;
+// 	} else {
+// 		cout << "Port: " << ntohs(sin.sin_port) << endl;
+// 	}
 
-	client_addr.sin_family = AF_INET;
-	client_addr.sin_port = htons(0);
-	client_addr.sin_addr.s_addr = htons(INADDR_ANY); 
+// 	client_addr.sin_family = AF_INET;
+// 	client_addr.sin_port = htons(0);
+// 	client_addr.sin_addr.s_addr = htons(INADDR_ANY); 
 
-	getifaddrs(&ifaddr);	
-	for(ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-		family = ifa->ifa_addr->sa_family;
-		s = getnameinfo(ifa->ifa_addr, (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6), host, 100, NULL, 0, NI_NUMERICHOST);
-		int count = 0;
+// 	getifaddrs(&ifaddr);	
+// 	for(ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+// 		family = ifa->ifa_addr->sa_family;
+// 		s = getnameinfo(ifa->ifa_addr, (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6), host, 100, NULL, 0, NI_NUMERICHOST);
+// 		int count = 0;
 		
-		for(int i = 0; i < strlen(host); i++) {
-			if(host[i] == '.') {
-				count++;
-			}
-		}
-		if(count == 3) {
-			cout << "IP: " << host << endl;			
-		}
-	}
+// 		for(int i = 0; i < strlen(host); i++) {
+// 			if(host[i] == '.') {
+// 				count++;
+// 			}
+// 		}
+// 		if(count == 3) {
+// 			cout << "IP: " << host << endl;			
+// 		}
+// 	}
 
-	freeifaddrs(ifaddr);
-	freeifaddrs(ifa);
-}
+// 	freeifaddrs(ifaddr);
+// 	freeifaddrs(ifa);
+// }
 
 void listenForConnections(int sockid) {
 	int sockchild;
