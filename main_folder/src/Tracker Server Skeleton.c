@@ -22,8 +22,8 @@
 #include <vector>
 using namespace std;
 
-string trackerFilePath;
-string sharedFilePath;
+string trackerFilePath; //stores file paths for server
+string sharedFilePath; //stores file paths for clients
 int MAX_SEND_LENGTH = 2000;
 int IP = 0;
 int PORT = 0;
@@ -33,6 +33,7 @@ struct tm newyear;
 pthread_mutex_t fileWriteLock;
 pthread_mutexattr_t attr;
 
+//Contains information related to each peer
 struct PeerInfo {
 	string ip;
 	string port;
@@ -42,6 +43,7 @@ struct PeerInfo {
 	string client_id;
 };
 
+//Contains information for tracker files
 struct TrackerFile {
 	string filename;
 	string filesize;
@@ -50,6 +52,7 @@ struct TrackerFile {
 	vector<PeerInfo> peerlist;
 };
 
+//Contains information for file downloading
 struct DownloadReq {
 	string filename;
 	int start_byte;
@@ -102,10 +105,14 @@ bool appendTrackerFile(TrackerFile &tf);
 int main(int argc, char* argv[]){
 	int sockid;
 
-	if(strcmp(argv[1],"localhost") == 0) 
+	if(strcmp(argv[1],"localhost") == 0)
+	{ 
 		IP = INADDR_LOOPBACK;
+	}
 	else
+	{
 		IP = atoi(argv[1]);
+	}
 	PORT = atoi(argv[2]);
 	numThreads = atoi(argv[3]);
 
@@ -130,7 +137,8 @@ int main(int argc, char* argv[]){
 		pthread_mutexattr_destroy(&attr);
 	}         
 }
-    
+
+//Gets the current working directory to assist in correct file search and download    
 void getWorkingDirectory() {
 	char cwd[100];
 
@@ -144,6 +152,7 @@ void getWorkingDirectory() {
 	trackerFilePath += "/test_server/";
 }
 
+//Parse tracker file line by line
 void loadTrackerFiles() {
 	DIR* FD;
 	struct dirent* in_file;
@@ -193,10 +202,11 @@ void setupTimer() {
 	newyear.tm_sec = 0;
 }
 
+//Sets up socket level connections between clients and tracker server
 int setupSocketConnections() {
    int sockid;
 
-   if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){//create socket connection oriented
+   if ((sockid = socket(AF_INET,SOCK_STREAM,0)) < 0){ //create socket connection oriented
 	   printf("socket cannot be created \n"); exit(0); 
    }
     
@@ -206,13 +216,14 @@ int setupSocketConnections() {
    server_addr.sin_port = htons(PORT);//change server port to NETWORK BYTE ORDER
    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);   
 
-   if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){//bind and check error
+   if (bind(sockid ,(struct sockaddr *) &server_addr, sizeof(server_addr)) ==-1){ //bind and check error
 	   printf("bind  failure\n"); exit(0); 
    }  
 
    return sockid;                                      
 }
 
+//Waits and listens for incomming connections from clients
 void listenForConnections(int sockid) {
 	int sockchild;
 	pid_t pid;
@@ -232,6 +243,7 @@ void listenForConnections(int sockid) {
 	close(sockchild);  // parent all done with client, only child will communicate with that client from now
 }
 
+//Handles client requests
 void peer_handler(int sock_child){ // function for file transfer. child process will call this function     
     //start handiling client request	
 	int length = -1;
@@ -248,16 +260,16 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 
 	cout << "Message received: " << read_msg << endl;
 
-	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){//list command received
-		handle_list_req(sock_child);// handle list request
+	if((!strcmp(read_msg, "REQ LIST"))||(!strcmp(read_msg, "req list"))||(!strcmp(read_msg, "<REQ LIST>"))||(!strcmp(read_msg, "<REQ LIST>\n"))){ //list command received
+		handle_list_req(sock_child); // handle list request
 	}
-	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){// get command received
+	else if((strstr(read_msg,"get")!=NULL)||(strstr(read_msg,"GET")!=NULL)){ // get command received
 		handle_get_req(sock_child, read_msg);
 	}
-	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){// get command received
+	else if((strstr(read_msg,"createtracker")!=NULL)||(strstr(read_msg,"Createtracker")!=NULL)||(strstr(read_msg,"CREATETRACKER")!=NULL)){ // get command received
 		handle_createtracker_req(sock_child, read_msg);		
 	}
-	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){// get command received
+	else if((strstr(read_msg,"updatetracker")!=NULL)||(strstr(read_msg,"Updatetracker")!=NULL)||(strstr(read_msg,"UPDATETRACKER")!=NULL)){ // get command received
 		handle_updatetracker_req(sock_child, read_msg);	
 	} else if(strstr(read_msg, "download") != NULL) {
 		handle_download(sock_child, read_msg);
@@ -265,17 +277,19 @@ void peer_handler(int sock_child){ // function for file transfer. child process 
 
 	trackerFiles.clear();
 	pthread_mutex_unlock(&fileWriteLock);
-}//end client handler function
+} //end client handler function
 
+//Handles clients request for creating tracker file
 void handle_createtracker_req(int sock_child, char* read_msg) {
 	string msg;
 	msg = createTrackerFile(read_msg);
 	cout << "Sending create tracker response..." << endl;
-	if((write(sock_child, msg.c_str(), 100)) < 0){//inform the server of the list request
+	if((write(sock_child, msg.c_str(), 100)) < 0){ //inform the server of the list request
 		printf("Send_request  failure\n"); exit(0);
 	}
 }
 
+//Creates tracker file in specified format
 string createTrackerFile(char* read_msg) {
 	TrackerFile tf = parseCreateTrackerMsg(read_msg);
 	FILE *fp;
@@ -321,6 +335,7 @@ string createTrackerFile(char* read_msg) {
 	return "<createtracker succ>";
 }
 
+//Parses tracker files
 TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	char* msg = read_msg;
 	char time[100];
@@ -344,6 +359,7 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	return tf;
 }
 
+//Handles clients request for listing tracker files
 void handle_list_req(int sock_child) {
 	string msg = "<REP LIST ";
 	stringstream ss;
@@ -392,6 +408,7 @@ void handle_list_req(int sock_child) {
 	}
 }
 
+//Handles clients requests for getting the specified file
 void handle_get_req(int sock_child, char* read_msg) {
 	string filename = parseGetRequest(read_msg);
 	TrackerFile tf;
@@ -443,6 +460,7 @@ string parseGetRequest(char* read_msg) {
 	return strtok(NULL, " ");
 }
 
+//Handles the downloading of the file by clients
 void handle_download(int sock_child, char* read_msg) {
 	DownloadReq dr = parseDownloadRequest(read_msg);
 	char sendBuf[MAX_SEND_LENGTH];
@@ -486,6 +504,7 @@ DownloadReq parseDownloadRequest(char* read_msg) {
 	return dr;
 }
 
+//Handles clients request to update tracker file
 void handle_updatetracker_req(int sock_child, char* read_msg) {
 	string msg = updateTrackerFile(read_msg);
 	cout << "Sending response: " << msg << endl;
@@ -527,6 +546,7 @@ bool writeTrackerFile(TrackerFile &tf) {
 	return true;
 }
 
+
 bool appendTrackerFile(PeerInfo &pi) {
 	FILE *fd;
 	fd = fopen((trackerFilePath + "/picture-wallpaper.jpg.track").c_str(), "a");
@@ -550,6 +570,7 @@ bool appendTrackerFile(PeerInfo &pi) {
 	return true;
 }
 
+//Updates tracker file
 string updateTrackerFile(char* read_msg) {	
 	char buff[100];
 	strcpy(buff, read_msg);
@@ -589,5 +610,3 @@ PeerInfo parseUpdateTrackerMsg(char* read_msg) {
 
 	return pi;
 }
-
-//@file
