@@ -399,7 +399,7 @@ TrackerFile parseCreateTrackerMsg(char* read_msg) {
 	tf.filename = strtok(NULL, " ");
 	tf.filesize = strtok(NULL, " ");
 	tf.description = strtok(NULL, " ");
-	// tf.md5 = strtok(NULL, " ");
+	tf.md5 = strtok(NULL, " ");
 	pi.ip = strtok(NULL, " ");
 	pi.port = strtok(NULL, " ");
 	pi.start_byte = "0";

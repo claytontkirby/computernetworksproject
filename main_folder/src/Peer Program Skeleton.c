@@ -307,7 +307,7 @@ void processCreateTrackerCommand(int sockid) {
 		stringstream ss;
 		// ss << configFile.port_num;
 		// string port = ss.str();
-		// string md5Sum;		
+		string md5Sum;		
 	
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
 			FullName = (char*) malloc(strlen(sharedFilePath.c_str()) + strlen(in_file->d_name) + 2);
@@ -326,19 +326,27 @@ void processCreateTrackerCommand(int sockid) {
 			list_req += " ";
 
 			//Calculate the md5 checksum and insert it into tracker file
-			// char funct_call[50];	//store function call for file open
-			// char md5[100];
-			// strcpy(funct_call, "md5sum ");
-			// strcat(funct_call, "shared/");					
-			// strcat(funct_call, in_file->d_name);	//append file name to function call
-			// FILE * pipe;
-			// pipe = popen(funct_call, "r");	//call md5 on file
-			// fgets(md5, 100, pipe);	//store output from md5sum call
-			// md5Sum = strtok(md5, " ");	
+			char funct_call[100];	//store function call for file open
+			char md5[200];
+			strcpy(funct_call, "md5 ");
+			strcat(funct_call, sharedFilePath.c_str());
+			// strcat(funct_call, "/");
+			// cout << sharedFilePath << endl;
+			// strcat(funct_call, "/");					
+			strcat(funct_call, in_file->d_name);	//append file name to function call
+			FILE * pipe;
+			pipe = popen(funct_call, "r");	//call md5 on file
+			fgets(md5, 200, pipe);	//store output from md5sum call
+			strtok(md5, " ");
+			strtok(NULL, " ");
+			strtok(NULL, " ");
+			// strtok(NULL, " ");
+			md5Sum = strtok(NULL, " ");
+			// cout << "Did MD5: " << md5Sum << endl;
 			
-			// list_req += md5Sum;
+			list_req += md5Sum;
 
-			// list_req += " ";
+			list_req += " ";
 			list_req += IPADDRESS;
 			list_req += " ";			
 			list_req += PORT;	
