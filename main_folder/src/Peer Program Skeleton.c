@@ -154,22 +154,14 @@ void main_rcv() {
 	pthread_mutex_init(&connection_lock, NULL);
 
 	while(j < 5) {
-		// cout << "looping" << endl;		
 		sock_id = setupConnections();		
  		string tfile = requestTrackerFile(sock_id, "picture-wallpaper.jpg");
 		TrackerFile tf = parseTrackerFile(tfile, prev_byte_1, prev_byte_2, prev_byte_3, prev_byte_4, prev_byte_5);
 		if(tf.isNULL == true) {
-			// cout << "continuing" << endl;
 			usleep(500000);
 			continue;			
 		}
-		// cout << "Prev byte 1: " << prev_byte_1 << " new byte: " << tf.peerlist[0].end_byte << endl; 
-		// cout << "Prev byte 2: " << prev_byte_2 << " new byte: " << tf.peerlist[1].end_byte << endl; 
-		// cout << "Prev byte 3: " << prev_byte_3 << " new byte: " << tf.peerlist[2].end_byte << endl; 
-		// cout << "Prev byte 4: " << prev_byte_4 << " new byte: " << tf.peerlist[3].end_byte << endl; 
-		// cout << "Prev byte 5: " << prev_byte_5 << " new byte: " << tf.peerlist[4].end_byte << endl;
-		// cout << tf.peerlist.size() << endl;
-		// cout << "new byte1: " << tf.peerlist[0]		
+
 		if(prev_byte_1 != atoi(tf.peerlist[0].end_byte.c_str()) &&
 			prev_byte_2 != atoi(tf.peerlist[1].end_byte.c_str()) &&
 			prev_byte_3 != atoi(tf.peerlist[2].end_byte.c_str()) &&
@@ -182,24 +174,14 @@ void main_rcv() {
 			prev_byte_4 = atoi(tf.peerlist[3].end_byte.c_str()) + 1;
 			prev_byte_5 = atoi(tf.peerlist[4].end_byte.c_str()) + 1;
 
-			// if(CLIENT_ID == 6) {
-			// 	cout << "CHUNK " << j << ":" << endl; 
-			// }
 			for(int i = 0; i < 5; i++) {
 				p[i].name = tf.filename;
 				p[i].start_byte = tf.peerlist[i].start_byte;
 				p[i].end_byte = tf.peerlist[i].end_byte;				
-				// if(CLIENT_ID == 6) {
-
-				// 	cout << "Client " << CLIENT_ID << " thread " << i+1 << " peer " << i << " start byte " << p[i].start_byte << endl;				
-				// 	cout << "Client " << CLIENT_ID << " thread " << i+1 << " peer " << i << " end byte " << p[i].end_byte << endl;								
-				// }
-
 				p[i].sockid = setupConnections();
 				p[i].threadid = i+1;
 			}
-			// if(CLIENT_ID == 6)
-			// 	cout << "*******************************" << endl << endl;
+
 			pthread_create(&t1, NULL, run, &p[0]);
 			pthread_create(&t2, NULL, run, &p[1]);
 			pthread_create(&t3, NULL, run, &p[2]);
@@ -214,7 +196,6 @@ void main_rcv() {
 			}			
 			j++;
 		}
-		// usleep(500000);
 		sleep(1);		
 	}
 
@@ -305,8 +286,6 @@ void processCreateTrackerCommand(int sockid) {
 		string list_req = "createtracker";
 		char msg[101];		
 		stringstream ss;
-		// ss << configFile.port_num;
-		// string port = ss.str();
 		string md5Sum;		
 	
 		if(strncmp(in_file->d_name, ".", 1) != 0) {
@@ -330,9 +309,6 @@ void processCreateTrackerCommand(int sockid) {
 			char md5[200];
 			strcpy(funct_call, "md5 ");
 			strcat(funct_call, sharedFilePath.c_str());
-			// strcat(funct_call, "/");
-			// cout << sharedFilePath << endl;
-			// strcat(funct_call, "/");					
 			strcat(funct_call, in_file->d_name);	//append file name to function call
 			FILE * pipe;
 			pipe = popen(funct_call, "r");	//call md5 on file
@@ -340,12 +316,8 @@ void processCreateTrackerCommand(int sockid) {
 			strtok(md5, " ");
 			strtok(NULL, " ");
 			strtok(NULL, " ");
-			// strtok(NULL, " ");
-			md5Sum = strtok(NULL, " ");
-			// cout << "Did MD5: " << md5Sum << endl;
-			
+			md5Sum = strtok(NULL, " ");			
 			list_req += md5Sum;
-
 			list_req += " ";
 			list_req += IPADDRESS;
 			list_req += " ";			
@@ -366,7 +338,6 @@ void processCreateTrackerCommand(int sockid) {
 				printf("Read failure (create tracker) with error %d\n", errno); exit(0); 
 			}
 
-			// cout << msg << endl;
 			msg[100] = '\0';
 			list_req="";
 			close(sockid);				
@@ -438,13 +409,10 @@ void processUpdateTrackerCommand(int sockid) {
 			list_req += " ";
 			ss << CLIENT_ID;
 			list_req += ss.str();
-			// cout << CURRENT_CHUNK_BEGIN << endl;
-			// cout << CURRENT_CHUNK_END << endl;
-			// cout << list_req << endl;
+
 			while(!updateSuccessful && totalBytesSent < list_req.size()) {
 				bytesSentThisTime = write(sockid, list_req.c_str(), list_req.size());
 				totalBytesSent += bytesSentThisTime;
-				// cout << "Bytes sent: " << totalBytesSent << " && " << " Bytes desired: " << list_req.size();
 				if(bytesSentThisTime < 0){//inform the server of the list request
 					printf("Send_request failure\n");	
 					updateSuccessful = false;														
@@ -457,7 +425,6 @@ void processUpdateTrackerCommand(int sockid) {
 				printf("Read failure (update tracker) with error %d\n", errno); exit(0); 
 			}
 
-			// cout << msg << endl;
 			msg[100] = '\0';
 			list_req="";
 			close(sockid);
@@ -534,7 +501,6 @@ string requestTrackerFile(int sockid, string file) {
 	if(strlen(messageBody) > 0) {
 		fr = fopen(fpath, "wb");
 
-		// cout << "Received message of size: " << messageBody << endl;
 		if (fr == NULL) {
 			cout << "File cannot be opened" << endl;
 			return "";
@@ -574,8 +540,7 @@ TrackerFile parseTrackerFile(string tfile, int prev_byte_1, int prev_byte_2, int
 		getline(in, pi.end_byte, ':');
 		getline(in, pi.timestamp, ':');
 		getline(in, pi.client_id);
-		// cout << "start: " << pi.start_byte << endl;
-		// cout << "end: " << pi.end_byte << endl;
+
 		if(!in.eof() && (
 			(atoi(pi.end_byte.c_str()) == prev_byte_1 + 1785) ||
 			(atoi(pi.end_byte.c_str()) == prev_byte_2 + 1785) ||
@@ -625,10 +590,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 					memcpy(&THREAD1_RECVBUF[THREAD1_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
 				}			
 				if(fd_block_size == 0)
-					downloadInProgress = false;//cout << "error downloading, errno " << errno << endl;
+					downloadInProgress = false;
 				else 
 					THREAD1_RECVSIZE -= rcvdThisTime;
-				// cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
 				break;
 			case 2:
 				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
@@ -637,10 +601,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 					memcpy(&THREAD2_RECVBUF[THREAD2_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
 				}
 				if(fd_block_size == 0) 
-					downloadInProgress = false;//cout << "error downloading, errno " << errno << endl;
+					downloadInProgress = false;
 				else
 					THREAD2_RECVSIZE -= rcvdThisTime;
-				// cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
 				break;
 			case 3:
 				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
@@ -649,10 +612,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 					memcpy(&THREAD3_RECVBUF[THREAD3_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
 				}
 				if(fd_block_size == 0) 
-					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+					downloadInProgress = false;
 				else
 					THREAD3_RECVSIZE -= rcvdThisTime;
-				// cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
 				break;
 			case 4:
 				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
@@ -661,10 +623,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 					memcpy(&THREAD4_RECVBUF[THREAD4_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
 				}
 				if(fd_block_size == 0) 
-					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+					downloadInProgress = false;
 				else
 					THREAD4_RECVSIZE -= rcvdThisTime;
-				// cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
 				break;
 			case 5:
 				while((fd_block_size = recv(sockid, recvBuf, MAX_RECV_LENGTH, 0)) > 0) { 
@@ -673,10 +634,9 @@ void downloadFile(string filename, string start_byte, string end_byte, int socki
 					memcpy(&THREAD5_RECVBUF[THREAD5_RECVSIZE - fd_block_size], &recvBuf, fd_block_size); 
 				}
 				if(fd_block_size == 0) 
-					downloadInProgress = false; //cout << "error downloading, errno " << errno << endl;
+					downloadInProgress = false;
 				else
 					THREAD5_RECVSIZE -= rcvdThisTime;
-				// cout << "Client " << CLIENT_ID << " thread " << threadid << " downloaded " << fd_block_size << " bytes." << endl;
 				break;
 		}
 		close(sockid);
@@ -697,19 +657,12 @@ void writeToFile(string filename) {
 	}
 
 	fwrite(THREAD1_RECVBUF, sizeof(char), THREAD1_RECVSIZE, fd);
-	// cout << "1st chunk size " << THREAD1_RECVSIZE << endl;
 	fwrite(THREAD2_RECVBUF, sizeof(char), THREAD2_RECVSIZE, fd);
-	// cout << "2nd chunk size " << THREAD2_RECVSIZE << endl;
 	fwrite(THREAD3_RECVBUF, sizeof(char), THREAD3_RECVSIZE, fd);
-	// cout << "3rd chunk size " << THREAD3_RECVSIZE << endl;
 	fwrite(THREAD4_RECVBUF, sizeof(char), THREAD4_RECVSIZE, fd);
-	// cout << "4th chunk size " << THREAD4_RECVSIZE << endl;
 	fwrite(THREAD5_RECVBUF, sizeof(char), THREAD5_RECVSIZE, fd);
-	// cout << "5th chunk size " << THREAD5_RECVSIZE << endl;
 
 	fseek(fd, 0, SEEK_END);
-	// cout << "Received " << ftell(fd) << " bytes..." << endl;
-	// cout << "I am client_" << CLIENT_ID << ", and I received the file correctly!" << endl;
 	rewind(fd);
 	fclose(fd);
 }
